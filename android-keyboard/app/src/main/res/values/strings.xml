@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">LinguaLayer AI</string>
+    <string name="keyboard_service_name">LinguaLayer Universal Language Keyboard</string>
+    <string name="app_description">Universal language layer over communication applications.</string>
+</resources>

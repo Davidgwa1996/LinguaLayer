@@ -1,0 +1,15 @@
+/* Overlay CSS styles definition */
+#lingualayer-inject-overlay {
+  animation: lingualLayerSlideIn 0.3s ease-out;
+}
+
+@keyframes lingualLayerSlideIn {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

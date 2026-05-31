@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FAFAFA"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Title branding -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="LinguaLayer AI Android Options"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="#0F172A" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Universal Lang Translation Layer Keyboard"
+            android:textSize="12sp"
+            android:textColor="#64748B"
+            android:layout_marginTop="2sp"
+            android:layout_marginBottom="20sp" />
+
+        <!-- Privacy Shield notice box -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="#ECFDF5"
+            android:padding="14sp"
+            android:layout_marginBottom="16sp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🛡️ Privacy-First Consent Integrity"
+                android:textStyle="bold"
+                android:textColor="#065F46"
+                android:textSize="14sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="This custom keyboard does NOT log typed keystrokes. Translations occur transiently over secure Google Gemini API gateways only when you hit the active Translate widget bar explicitly."
+                android:textColor="#065F46"
+                android:textSize="12sp"
+                android:layout_marginTop="4sp" />
+
+            <CheckBox
+                android:id="@+id/consentCheckbox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="I authorize safe proxy translations"
+                android:textColor="#374151"
+                android:textSize="12sp"
+                android:layout_marginTop="8sp"
+                android:checked="true" />
+        </LinearLayout>
+
+        <!-- Spinner Native Lang selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="My Native preferred Language"
+            android:textStyle="bold"
+            android:textColor="#1E293B"
+            android:textSize="13sp" />
+
+        <Spinner
+            android:id="@+id/nativeLangSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- target Lang selection -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Target conversation language"
+            android:textStyle="bold"
+            android:textColor="#1E293B"
+            android:textSize="13sp" />
+
+        <Spinner
+            android:id="@+id/targetLangSpinner"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="24dp" />
+
+        <Button
+            android:id="@+id/btnSaveConfig"
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:text="Save Translation Presets"
+            android:backgroundTint="#0F172A"
+            android:textColor="#FFFFFF" />
+            
+    </LinearLayout>
+</ScrollView>

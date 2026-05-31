@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>LinguaLayer AI</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      width: 280px;
+      padding: 12px;
+      margin: 0;
+      background: #fdfdfd;
+      color: #222;
+    }
+    h2 {
+      font-size: 14px;
+      margin: 0 0 8px 0;
+      color: #111;
+      font-weight: 700;
+    }
+    select, button, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px;
+      margin-bottom: 8px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 12px;
+      outline: none;
+    }
+    button {
+      background: #111;
+      color: #fff;
+      font-weight: 600;
+      border: none;
+      cursor: pointer;
+      transition: background 0.18s;
+    }
+    button:hover {
+      background: #222;
+    }
+    .footer {
+      font-size: 9px;
+      color: #888;
+      text-align: center;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>LinguaLayer Language Overlay</h2>
+  <textarea id="sourceText" placeholder="Select or type copy here..." rows="3"></textarea>
+  
+  <select id="targetLanguage">
+    <option value="English">English</option>
+    <option value="Chinese">Chinese</option>
+    <option value="French">French</option>
+    <option value="Arabic">Arabic</option>
+    <option value="Spanish">Spanish</option>
+    <option value="Swahili">Swahili</option>
+  </select>
+
+  <button id="translateButton">Translate Selected Layer</button>
+  <div id="output" style="font-size: 12px; font-weight: 500; background: #f0f0f0; padding: 8px; border-radius: 8px; margin-top: 4px; display: none; max-height: 100px; overflow-y: auto;"></div>
+  
+  <div class="footer">Securely translated prior to encryption overlay.</div>
+  <script src="popup.js"></script>
+</body>
+</html>

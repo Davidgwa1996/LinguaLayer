@@ -38,7 +38,7 @@ import MotionVideoDemo from "./pages/MotionVideoDemo.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
 import type { User as FirebaseAuthUser } from "firebase/auth";
 
-const LiveChatFlow = () => {
+const LiveChatFlow: React.FC<{ settings: UserProfile }> = ({ settings }) => {
   const [selectedLanguage, setSelectedLanguage] = useState(() => {
     return sessionStorage.getItem("lingualayer_session_language") || "";
   });
@@ -70,15 +70,22 @@ const LiveChatFlow = () => {
     if (authU && lang) {
       try {
         const LANGUAGES = [
-          { code: "en-US", name: "US English", nativeName: "English (US)" },
-          { code: "en-GB", name: "UK English", nativeName: "English (UK)" },
-          { code: "zh-CN", name: "Chinese", nativeName: "中文" },
-          { code: "es", name: "Spanish", nativeName: "Español" },
-          { code: "fr", name: "French", nativeName: "Français" },
-          { code: "it", name: "Italian", nativeName: "Italiano" },
-          { code: "de", name: "German", nativeName: "Deutsch" },
+          { code: "en", name: "English", nativeName: "English" },
+          { code: "zh-CN", name: "Mandarin Chinese", nativeName: "中文" },
+          { code: "ru", name: "Russian", nativeName: "Русский" },
+          { code: "pt", name: "Portuguese", nativeName: "Português" },
           { code: "hi", name: "Hindi", nativeName: "हिन्दी" },
-          { code: "ar", name: "Arabic", nativeName: "العربية" }
+          { code: "ar", name: "Arabic", nativeName: "العربية" },
+          { code: "fr", name: "French", nativeName: "Français" },
+          { code: "es", name: "Spanish", nativeName: "Español" },
+          { code: "de", name: "German", nativeName: "Deutsch" },
+          { code: "it", name: "Italian", nativeName: "Italiano" },
+          { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia" },
+          { code: "bn", name: "Bengali", nativeName: "বাংলা" },
+          { code: "ta", name: "Tamil", nativeName: "தமிழ்" },
+          { code: "tr", name: "Turkish", nativeName: "Türkçe" },
+          { code: "ja", name: "Japanese", nativeName: "日本語" },
+          { code: "te", name: "Telugu", nativeName: "తెలుగు" }
         ];
         const langConfig = LANGUAGES.find(l => l.code === lang);
         await upsertUserProfile(authU.uid, lang, langConfig?.name || lang);
@@ -112,7 +119,7 @@ const LiveChatFlow = () => {
 
   return (
     <ErrorBoundary onReset={handleChangeLanguage}>
-      <LiveChatRoom selectedLanguage={selectedLanguage} onChangeLanguage={handleChangeLanguage} />
+      <LiveChatRoom selectedLanguage={selectedLanguage} onChangeLanguage={handleChangeLanguage} settings={settings} />
     </ErrorBoundary>
   );
 };
@@ -196,13 +203,13 @@ export default function App() {
     switch (currentPage) {
       case "home": return <HomePage onNavigate={setCurrentPage} simpleMode={settings.simpleModeEnabled} />;
       case "translator": return <TranslatorPage simpleMode={settings.simpleModeEnabled} userLanguage={settings.preferredLanguage} />;
-      case "livechat": return <LiveChatFlow />;
+      case "livechat": return <LiveChatFlow settings={settings} />;
       case "videodemo": return <MotionVideoDemo />;
       case "voice": return <VoiceTranslatorPage simpleMode={settings.simpleModeEnabled} />;
       case "business": return <BusinessModePage />;
       case "settings": return <SettingsPage settings={settings} onUpdateSettings={handleUpdateSettings} simpleMode={settings.simpleModeEnabled} onToggleSimpleMode={handleToggleSimpleMode} />;
       case "privacy": return <PrivacyPage />;
-      default: return <LiveChatFlow />;
+      default: return <LiveChatFlow settings={settings} />;
     }
   };
 

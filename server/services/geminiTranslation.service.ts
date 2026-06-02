@@ -223,7 +223,11 @@ export class GeminiTranslationService {
     const ai = getAI();
     let glossaryStr = "";
     if (GLOSSARY_RULES.length > 0) {
-      glossaryStr = "\nTerminology Glossary Rules:\n" + JSON.stringify(GLOSSARY_RULES, null, 2);
+      glossaryStr += "\nTerminology Glossary Rules:\n" + JSON.stringify(GLOSSARY_RULES, null, 2);
+    }
+    if (req.preservedTerms && req.preservedTerms.length > 0) {
+      const customTermsStr = req.preservedTerms.join(", ");
+      glossaryStr += `\nCRITICAL MUST PRESERVE TERMS: You must not translate the following terms: ${customTermsStr}. They must appear exactly as written in the target language text.`;
     }
 
     const systemPrompt = `You are LinguaLayer AI's invisible message delivery engine.
@@ -279,6 +283,7 @@ viewerLanguageCode: ${finalTargetLanguageCode}
               viewerLanguageName: { type: Type.STRING },
               translatedText: { type: Type.STRING },
               confidence: { type: Type.NUMBER },
+              qualityScore: { type: Type.NUMBER, nullable: true },
               criticalTermsPreserved: { type: Type.ARRAY, items: { type: Type.STRING } },
               ambiguity: { type: Type.STRING, nullable: true },
               warning: { type: Type.STRING, nullable: true }
@@ -303,6 +308,7 @@ viewerLanguageCode: ${finalTargetLanguageCode}
         targetLanguageCode: parsedRaw.viewerLanguageCode || finalTargetLanguageCode,
         translatedText: parsedRaw.translatedText,
         confidence: parsedRaw.confidence || 0.9,
+        qualityScore: parsedRaw.qualityScore || undefined,
         warning: parsedRaw.warning || null,
         ambiguity: parsedRaw.ambiguity || null,
       };

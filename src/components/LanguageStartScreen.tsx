@@ -2,15 +2,22 @@ import React, { useState } from "react";
 import { MessageSquare, ArrowRight } from "lucide-react";
 
 const LANGUAGES = [
-  { code: "en-US", name: "US English", nativeName: "English (US)" },
-  { code: "en-GB", name: "UK English", nativeName: "English (UK)" },
-  { code: "zh-CN", name: "Chinese", nativeName: "中文" },
-  { code: "es", name: "Spanish", nativeName: "Español" },
-  { code: "fr", name: "French", nativeName: "Français" },
-  { code: "it", name: "Italian", nativeName: "Italiano" },
-  { code: "de", name: "German", nativeName: "Deutsch" },
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "zh-CN", name: "Mandarin Chinese", nativeName: "中文" },
+  { code: "ru", name: "Russian", nativeName: "Русский" },
+  { code: "pt", name: "Portuguese", nativeName: "Português" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी" },
-  { code: "ar", name: "Arabic", nativeName: "العربية" }
+  { code: "ar", name: "Arabic", nativeName: "العربية" },
+  { code: "fr", name: "French", nativeName: "Français" },
+  { code: "es", name: "Spanish", nativeName: "Español" },
+  { code: "de", name: "German", nativeName: "Deutsch" },
+  { code: "it", name: "Italian", nativeName: "Italiano" },
+  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia" },
+  { code: "bn", name: "Bengali", nativeName: "বাংলা" },
+  { code: "ta", name: "Tamil", nativeName: "தமிழ்" },
+  { code: "tr", name: "Turkish", nativeName: "Türkçe" },
+  { code: "ja", name: "Japanese", nativeName: "日本語" },
+  { code: "te", name: "Telugu", nativeName: "తెలుగు" }
 ];
 
 export const LanguageStartScreen: React.FC<{ onStart: (code: string) => void }> = ({ onStart }) => {

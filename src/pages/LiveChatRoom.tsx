@@ -7,26 +7,34 @@ import { getCurrentAuthUser } from "../services/authService.ts";
 import { upsertUserProfile } from "../services/userService.ts";
 import { createRoom, joinRoom, updateRoomTheme, pinMessage, unpinMessage } from "../services/roomService.ts";
 import { sendTextMessage, sendVoiceMessage, listenToMessages, addReaction } from "../services/messageService.ts";
-import { auth, db } from "../services/firebaseClient.ts";
+import { auth, db, logEvent, startTrace } from "../services/firebaseClient.ts";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { MessageInput } from "../components/MessageInput.tsx";
 import { ThemeCustomizer, ChatTheme } from "../components/ThemeCustomizer.tsx";
 import { PinnedMessageBar } from "../components/PinnedMessageBar.tsx";
 import { TranslationService } from "../services/translationService.ts";
+import { ReportIssueModal } from "../components/ReportIssueModal.tsx";
 
 const LANGUAGES = [
-  { code: "en-US", name: "US English", nativeName: "English (US)" },
-  { code: "en-GB", name: "UK English", nativeName: "English (UK)" },
-  { code: "zh-CN", name: "Chinese", nativeName: "中文" },
-  { code: "es", name: "Spanish", nativeName: "Español" },
-  { code: "fr", name: "French", nativeName: "Français" },
-  { code: "it", name: "Italian", nativeName: "Italiano" },
-  { code: "de", name: "German", nativeName: "Deutsch" },
+  { code: "en", name: "English", nativeName: "English" },
+  { code: "zh-CN", name: "Mandarin Chinese", nativeName: "中文" },
+  { code: "ru", name: "Russian", nativeName: "Русский" },
+  { code: "pt", name: "Portuguese", nativeName: "Português" },
   { code: "hi", name: "Hindi", nativeName: "हिन्दी" },
-  { code: "ar", name: "Arabic", nativeName: "العربية" }
+  { code: "ar", name: "Arabic", nativeName: "العربية" },
+  { code: "fr", name: "French", nativeName: "Français" },
+  { code: "es", name: "Spanish", nativeName: "Español" },
+  { code: "de", name: "German", nativeName: "Deutsch" },
+  { code: "it", name: "Italian", nativeName: "Italiano" },
+  { code: "id", name: "Indonesian", nativeName: "Bahasa Indonesia" },
+  { code: "bn", name: "Bengali", nativeName: "বাংলা" },
+  { code: "ta", name: "Tamil", nativeName: "தமிழ்" },
+  { code: "tr", name: "Turkish", nativeName: "Türkçe" },
+  { code: "ja", name: "Japanese", nativeName: "日本語" },
+  { code: "te", name: "Telugu", nativeName: "తెలుగు" }
 ];
 
-export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage: () => void }> = ({ selectedLanguage, onChangeLanguage }) => {
+export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage: () => void, settings: any }> = ({ selectedLanguage, onChangeLanguage, settings }) => {
   const [roomId, setRoomId] = useState<string>("");
   const [activeRoom, setActiveRoom] = useState<string>("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -39,6 +47,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
   const [participantLanguages, setParticipantLanguages] = useState<string[]>([]);
   const [theme, setTheme] = useState<ChatTheme>("default");
   const [pinnedMessageId, setPinnedMessageId] = useState<string | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
   
   const [isInitializing, setIsInitializing] = useState(true);
   const [initError, setInitError] = useState("");
@@ -69,6 +78,8 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
         if (currentRoom) {
            await joinRoom(currentRoom, user.uid, { code: selectedLanguage, name: langConfig?.name || selectedLanguage });
            setActiveRoom(currentRoom);
+           logEvent("room_joined", { roomId: currentRoom, language: selectedLanguage });
+           logEvent("language_selected", { language: selectedLanguage });
            const newUrl = new URL(window.location.href);
            newUrl.searchParams.set("room", currentRoom);
            window.history.replaceState({}, "", newUrl);
@@ -158,7 +169,8 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
             sourceLanguageCode: msg.originalLanguageCode || msg.senderLanguageCode || "unknown",
             sourceLanguage: msg.originalLanguage || msg.senderLanguageName || "Unknown",
             targetLanguageCode: selectedLanguage,
-            targetLanguage: langName
+            targetLanguage: langName,
+            preservedTerms: settings?.preservedTerms || []
           })),
           mode: fastMode ? "simple" : "normal"
         };
@@ -168,6 +180,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
         const batchUpdatePromises = response.results.map(async (res) => {
           if (res.translatedText === "Translation failed") {
              setTranslationError("Failed to translate some messages.");
+             logEvent("translation_failed", { messageId: res.id, targetLanguage: selectedLanguage });
              translatingRef.current.delete(res.id);
              return Promise.resolve();
           }
@@ -184,6 +197,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
               status: "ready"
             }
           });
+          logEvent("translation_prepared", { messageId: res.id, targetLanguage: selectedLanguage });
         });
         
         await Promise.all(batchUpdatePromises);
@@ -199,6 +213,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
   }, [messages, selectedLanguage, activeRoom, fastMode]);
 
   const handleStartRoom = async () => {
+    const traceRef = startTrace("room_join_latency");
     try {
         setIsInitializing(true);
         const user = await getCurrentAuthUser();
@@ -208,8 +223,10 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
         let newRoom = roomId.trim();
         if (newRoom) {
             await joinRoom(newRoom, user.uid, { code: selectedLanguage, name: langConfig?.name || selectedLanguage });
+            logEvent("room_joined", { roomId: newRoom, language: selectedLanguage });
         } else {
             newRoom = await createRoom(user.uid, { code: selectedLanguage, name: langConfig?.name || selectedLanguage });
+            logEvent("room_created", { roomId: newRoom, language: selectedLanguage });
         }
         
         const newUrl = new URL(window.location.href);
@@ -220,6 +237,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
         console.error("Join/Create Room Error", e);
         setInitError("We could not start your chat session. Please check your connection and try again.");
     } finally {
+        if (traceRef) traceRef.stop();
         setIsInitializing(false);
     }
   };
@@ -260,6 +278,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
     setLoading(true);
     setSendError(null);
     const textToSend = inputVal;
+    const sendTrace = startTrace("message_delivery_latency");
 
     try {
       if (!selectedLanguage) throw new Error("Please choose your language first.");
@@ -284,7 +303,8 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
                 sourceLanguageCode: selectedLanguage,
                 sourceLanguage: langConfig?.name || selectedLanguage,
                 targetLanguageCode: targetCode,
-                targetLanguage: targetName
+                targetLanguage: targetName,
+                preservedTerms: settings?.preservedTerms || []
               };
             }),
             mode: fastMode ? "simple" : "normal"
@@ -331,6 +351,8 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
         precomputedTranslations
       );
       
+      logEvent("message_sent", { roomId: activeRoom, language: selectedLanguage });
+      
       // Clear input only after successful send
       setInputVal("");
     } catch (err: any) {
@@ -350,6 +372,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
       }
       setSendError(friendlyError);
     } finally {
+      if (sendTrace) sendTrace.stop();
       setLoading(false);
     }
   };
@@ -372,6 +395,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
         languageCode: selectedLanguage,
         languageName: langConfig?.name || selectedLanguage
       });
+      logEvent("voice_message_sent", { roomId: activeRoom, language: selectedLanguage, durationMs });
     } catch (err: any) {
       console.error("Send voice failed:", err);
       setSendError(err.message || "Failed to send voice message. Please try again.");
@@ -394,8 +418,10 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
       try {
           if (pinnedMessageId === messageId) {
              await unpinMessage(activeRoom);
+             logEvent("message_unpinned", { roomId: activeRoom, messageId });
           } else {
              await pinMessage(activeRoom, messageId);
+             logEvent("message_pinned", { roomId: activeRoom, messageId });
           }
       } catch (err) {
           console.error("Could not pin message", err);
@@ -505,6 +531,12 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
           </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowReportModal(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50/50 px-3 py-1.5 text-xs font-medium hover:bg-red-100 transition shadow-sm text-red-600"
+            >
+              Report issue
+            </button>
             <button onClick={onChangeLanguage} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white/50 px-3 py-1.5 text-xs font-medium hover:bg-slate-100 transition shadow-sm text-slate-800">
               <Globe className="h-3.5 w-3.5" />
               <span>{currentLangNative}</span>
@@ -550,6 +582,8 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
                 preferredLanguage: msg.originalLanguage 
               };
               
+              const showOriginalAdmin = import.meta.env.VITE_ENABLE_DEBUG_PANEL === "true";
+              
               return (
                 <ConversationBubble
                   key={msg.id}
@@ -562,6 +596,7 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
                   onReact={(emoji) => handleReact(msg.id, emoji)}
                   isPinned={pinnedMessageId === msg.id}
                   onPinToggle={() => handlePinToggle(msg.id)}
+                  showOriginalAdmin={showOriginalAdmin}
                 />
               )
             })
@@ -604,6 +639,14 @@ export const LiveChatRoom: React.FC<{ selectedLanguage: string, onChangeLanguage
           themeVars={themeVars}
         />
       </section>
+      
+      {showReportModal && (
+        <ReportIssueModal 
+          roomId={activeRoom}
+          userLanguage={selectedLanguage}
+          onClose={() => setShowReportModal(false)}
+        />
+      )}
     </main>
   );
 };

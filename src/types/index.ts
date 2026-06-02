@@ -12,6 +12,7 @@ export interface UserProfile {
   simpleModeEnabled?: boolean;
   voiceModeEnabled?: boolean;
   privacyHistoryConsent?: boolean;
+  preservedTerms?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -60,6 +61,7 @@ export interface ChatMessage {
     targetLanguageCode: string;
     translatedText: string;
     confidence?: number;
+    qualityScore?: number;
     warning?: string | null;
     ambiguity?: string | null;
     status?: "pending" | "ready" | "failed";
@@ -77,6 +79,7 @@ export interface TranslationRequest {
   tone?: 'neutral' | 'friendly' | 'formal' | 'business' | 'simple' | 'respectful' | 'casual';
   mode?: 'normal' | 'business' | 'simple';
   preserveOriginal?: boolean;
+  preservedTerms?: string[];
   simpleExplanation?: boolean;
   conversationContext?: { speaker: string; language: string; text: string }[];
 }
@@ -88,6 +91,7 @@ export interface BatchTranslationRequestItem {
   sourceLanguage?: string;
   targetLanguageCode: string;
   targetLanguage?: string;
+  preservedTerms?: string[];
 }
 
 export interface BatchTranslationRequest {
@@ -100,6 +104,7 @@ export interface BatchTranslationResponse {
     id: string;
     translatedText: string;
     confidence: number;
+    qualityScore?: number;
     targetLanguageCode: string;
     warning?: string | null;
     ambiguity?: string | null;
@@ -113,6 +118,7 @@ export interface TranslationResponse {
   targetLanguageCode: string;
   translatedText: string;
   confidence: number;
+  qualityScore?: number;
   warning: string | null;
   simpleExplanation?: string;
   preservedTerms?: string[];

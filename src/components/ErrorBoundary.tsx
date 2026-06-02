@@ -24,7 +24,29 @@ export class ErrorBoundary extends React.Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    if (typeof window !== "undefined") {
+      const metadata = {
+        errorMessage: error.message,
+        componentStack: errorInfo.componentStack,
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+      console.error("CRITICAL ERROR BOUNDARY CATCH:\n", JSON.stringify(metadata, null, 2));
+      
+      try {
+        const { logEvent } = require("../services/firebaseClient.ts");
+        logEvent('error_boundary_triggered', {
+           errorMessage: error.message,
+           stackSize: errorInfo.componentStack?.length || 0,
+           url: window.location.pathname
+        });
+      } catch (e) {
+        // safe catch
+      }
+    } else {
+      console.error("Uncaught error:", error, errorInfo);
+    }
   }
 
   public render() {

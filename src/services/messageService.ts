@@ -1,4 +1,4 @@
-import { db } from "./firebaseClient.ts";
+import { db, logEvent } from "./firebaseClient.ts";
 import { collection, doc, setDoc, updateDoc, onSnapshot, query, orderBy, serverTimestamp, arrayUnion, arrayRemove } from "firebase/firestore";
 import { getCurrentAuthUser } from "./authService.ts";
 import { joinRoom } from "./roomService.ts";
@@ -67,7 +67,19 @@ export const listenToMessages = (roomId: string, callback: (messages: any[]) => 
     orderBy("createdAt", "asc")
   );
   
+  let isFirstLoad = true;
+
   return onSnapshot(q, (snapshot) => {
+    // Only log new messages (skip the initial bulk list)
+    if (!isFirstLoad) {
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added") {
+          logEvent("message_received", { roomId, messageId: change.doc.id });
+        }
+      });
+    }
+    isFirstLoad = false;
+    
     const messages = snapshot.docs.map(doc => {
       const data = doc.data();
       let createdAtStr = new Date().toISOString();
@@ -110,6 +122,7 @@ export const addReaction = async (roomId: string, messageId: string, emoji: stri
   });
 
   await updateDoc(msgRef, updatePayload);
+  logEvent("reaction_added", { roomId, messageId, emoji });
 };
 
 export const removeReaction = async (roomId: string, messageId: string, uid: string, currentEmoji: string) => {

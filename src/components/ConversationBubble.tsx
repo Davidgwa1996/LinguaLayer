@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { Volume2, Sparkles, Check, Globe, Smile, CheckCheck, Pin } from "lucide-react";
+import { Volume2, Sparkles, Check, Globe, Smile, CheckCheck, Pin, ShieldCheck, ShieldAlert } from "lucide-react";
 import { ChatMessage, UserProfile } from "../types/index.ts";
 import { ApiClient } from "../services/apiClient.ts";
 import { AudioClientService } from "../services/audioClient.ts";
@@ -21,6 +21,7 @@ export interface ConversationBubbleProps {
   readStatus?: boolean;
   isPinned?: boolean;
   onPinToggle?: () => void;
+  showOriginalAdmin?: boolean;
 }
 
 const EMOJIS = ["👍", "❤️", "😂", "😮", "🙏"];
@@ -56,7 +57,8 @@ export const ConversationBubble: React.FC<ConversationBubbleProps> = ({
   onReact,
   readStatus,
   isPinned,
-  onPinToggle
+  onPinToggle,
+  showOriginalAdmin
 }) => {
   const [playing, setPlaying] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -70,28 +72,40 @@ export const ConversationBubble: React.FC<ConversationBubbleProps> = ({
   
   let isNativeMatch = isSelf || (message.originalLanguageCode || message.senderLanguageCode) === viewer.languageCode;
   let displayText = "";
-  let languageLabel = "";
+  let languageLabel = viewer.preferredLanguage || "Translated";
   let isPending = false;
+  let confidenceInfo = null;
   
   if (message.type === 'voice') {
      displayText = message.transcript || "🎤 Voice message";
-     languageLabel = message.originalLanguageName || message.senderLanguageName || "Voice";
+     if (showOriginalAdmin && showOriginal) {
+       languageLabel = message.originalLanguageName || message.senderLanguageName || "Original";
+     }
   } else if (isNativeMatch) {
     displayText = message.originalText || "";
-    languageLabel = isSelf ? "Original" : (message.originalLanguageName || viewer.preferredLanguage || "Unknown");
+    if ((showOriginalAdmin && showOriginal) || isSelf) {
+      languageLabel = viewer.preferredLanguage || "Original";
+    }
   } else {
     const translation = message.translations?.[viewer.languageCode || 'en'];
     if (translation && (translation.translatedText || translation.status === "failed")) {
       if (translation.status === "failed") {
         displayText = "Message could not be prepared in your language. Tap to retry.";
-        languageLabel = viewer.preferredLanguage || "Translated";
       } else {
-        displayText = showOriginal ? (message.originalText || "") : translation.translatedText;
-        languageLabel = showOriginal ? (message.originalLanguageName || "Original") : (viewer.preferredLanguage || "Translated");
+        displayText = (showOriginalAdmin && showOriginal) ? (message.originalText || "") : translation.translatedText;
+        if (showOriginalAdmin && showOriginal) {
+          languageLabel = message.originalLanguageName || "Original";
+        }
+        
+        confidenceInfo = {
+          confidence: translation.confidence || 0,
+          qualityScore: translation.qualityScore,
+          warning: translation.warning,
+          ambiguity: translation.ambiguity
+        };
       }
     } else {
       displayText = "Preparing message...";
-      languageLabel = viewer.preferredLanguage || "Preparing";
       isPending = true;
     }
   }
@@ -155,12 +169,12 @@ export const ConversationBubble: React.FC<ConversationBubbleProps> = ({
             <p className={`font-sans font-medium text-sm md:text-base leading-relaxed break-words text-left ${isPending ? 'animate-pulse text-slate-500 italic' : ''}`}>
               {displayText}
             </p>
-            {!isSelf && !isNativeMatch && !isPending && (
+            {showOriginalAdmin && !isSelf && !isNativeMatch && !isPending && (
               <button 
                 onClick={() => setShowOriginal(!showOriginal)}
                 className={`mt-2 text-[10px] w-fit font-bold uppercase tracking-wider hover:opacity-80 transition ${isSelf ? 'text-indigo-200' : 'text-slate-400 hover:text-slate-600'}`}
               >
-                {showOriginal ? "Show translation" : "Show original"}
+                {showOriginal ? "Hide admin original" : "Admin: Show original"}
               </button>
             )}
           </div>
@@ -168,7 +182,27 @@ export const ConversationBubble: React.FC<ConversationBubbleProps> = ({
 
         <div className={`flex items-center space-x-2 mt-2.5 pt-2 border-t ${isSelf ? "justify-end border-indigo-500/40 text-indigo-200" : "justify-between border-slate-100 text-slate-400"}`}>
           <div className="flex items-center space-x-1.5">
-            {isNativeMatch ? <Check className="w-3 h-3" /> : <Globe className="w-3 h-3" />}
+            {isNativeMatch ? <Check className="w-3 h-3" /> : (
+              <div className="flex items-center space-x-1 group/badge relative cursor-help">
+                <Globe className="w-3 h-3" />
+                {confidenceInfo && (
+                  confidenceInfo.confidence > 0.85 ? (
+                    <ShieldCheck className="w-3 h-3 text-emerald-500" />
+                  ) : (
+                    <ShieldAlert className="w-3 h-3 text-amber-500" />
+                  )
+                )}
+                {confidenceInfo && (
+                  <div className="absolute bottom-full left-0 mb-2 hidden group-hover/badge:flex flex-col w-48 bg-slate-800 text-white text-[10px] p-2 rounded shadow-xl z-20 pointer-events-none">
+                     <span className="font-bold border-b border-slate-600 pb-1 mb-1">Language Quality</span>
+                     <span>Confidence: {Math.round(confidenceInfo.confidence * 100)}%</span>
+                     {confidenceInfo.qualityScore && <span>Score: {confidenceInfo.qualityScore}/100</span>}
+                     {confidenceInfo.warning && <span className="text-amber-300 mt-1">Warning: {confidenceInfo.warning}</span>}
+                     {confidenceInfo.ambiguity && <span className="text-blue-300 mt-1">Note: {confidenceInfo.ambiguity}</span>}
+                  </div>
+                )}
+              </div>
+            )}
             <span className="text-[9.5px] font-bold tracking-wide uppercase">
               {languageLabel}
             </span>

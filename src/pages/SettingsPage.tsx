@@ -135,6 +135,53 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
         </div>
       </div>
 
+      {/* Preserved Terms */}
+      <div className="bg-white border border-slate-200/95 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm">
+        <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-slate-400 font-sans">
+          <Settings className="w-4 h-4 text-indigo-500" />
+          <span>Custom Terminology & Brands</span>
+        </div>
+
+        <div className="space-y-3">
+           <p className="text-xs text-slate-500">
+             Add specific brand names, acronyms, or technical phrases that should NEVER be translated (e.g., LinguaLayer, AcmeCorp). Hit Enter to add.
+           </p>
+           <div className="flex flex-wrap gap-2 mb-2">
+             {(settings.preservedTerms || []).map((term, i) => (
+               <span key={i} className="flex items-center px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-mono border border-slate-200">
+                 {term}
+                 <button 
+                   type="button"
+                   onClick={() => {
+                     const newTerms = (settings.preservedTerms || []).filter((_, idx) => idx !== i);
+                     onUpdateSettings({ preservedTerms: newTerms });
+                   }}
+                   className="ml-2 text-slate-400 hover:text-red-500"
+                 >
+                   &times;
+                 </button>
+               </span>
+             ))}
+           </div>
+           
+           <input
+             type="text"
+             placeholder="Type a term and press Enter..."
+             className="w-full max-w-sm px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500"
+             onKeyDown={(e) => {
+               if (e.key === 'Enter') {
+                 e.preventDefault();
+                 const val = e.currentTarget.value.trim();
+                 if (val && !(settings.preservedTerms || []).includes(val)) {
+                   onUpdateSettings({ preservedTerms: [...(settings.preservedTerms || []), val] });
+                 }
+                 e.currentTarget.value = "";
+               }
+             }}
+           />
+        </div>
+      </div>
+
       {/* 📱 Real-time Mobile Device Connectivity / Testing */}
       <div className="bg-gradient-to-br from-indigo-50/70 to-slate-50 border border-indigo-100 rounded-3xl p-5 md:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between">

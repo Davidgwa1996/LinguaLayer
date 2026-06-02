@@ -171,9 +171,9 @@ export const HomePage: React.FC<HomePageProps> = ({
           />
 
           <BigButton
-            onClick={() => onNavigate("simulator")}
-            label="2. Conversation Game (Simulator)"
-            subLabel="Person A (English) chats with Person B (Chinese) live."
+            onClick={() => onNavigate("livechat")}
+            label="2. Live Chat Room"
+            subLabel="Create a room and chat seamlessly with automatic translations."
             icon="💬"
             variant="accent"
           />

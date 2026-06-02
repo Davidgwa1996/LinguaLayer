@@ -19,28 +19,31 @@ import {
 const router = Router();
 
 // --- In-Memory Simulation Storage (Supports simultaneous laptop/mobile testing) ---
-let simulationMessages: any[] = [
-  {
-    id: "m0",
-    sender: "A",
-    originalText: "I want to buy some high quality building supplies.",
-    translatedText: "我想购买一些高质量的建筑材料。",
-    sourceLanguage: "English (United States)",
-    targetLanguage: "Chinese (Mandarin/Simplified)",
-    timestamp: "11:30 AM",
-    simpleExplanation: "The person is looking to buy building tools."
-  },
-  {
-    id: "m1",
-    sender: "B",
-    originalText: "我们可以送货上门吗？",
-    translatedText: "Can we deliver to your doorstep?",
-    sourceLanguage: "Chinese (Mandarin/Simplified)",
-    targetLanguage: "English (United States)",
-    timestamp: "11:31 AM",
-    simpleExplanation: "They are asking about shipping arrangements."
-  }
-];
+let simulationMessages: any[] = [];
+let simulationLanguages = {
+  langA: "English (United States)",
+  langB: "Chinese (Mandarin/Simplified)"
+};
+
+// --- In-Memory Boardroom Storage (Up to 5+ simultaneous people speaking different languages) ---
+interface BoardroomUser {
+  id: string;
+  username: string;
+  preferredLanguage: string;
+  joinedAt: number;
+}
+
+interface BoardroomMessage {
+  id: string;
+  senderName: string;
+  originalText: string;
+  originalLanguage: string;
+  timestamp: string;
+  simpleExplanation?: string;
+}
+
+let boardroomUsers: BoardroomUser[] = [];
+let boardroomMessages: BoardroomMessage[] = [];
 
 router.get("/simulation/messages", (req, res) => {
   res.json(simulationMessages);
@@ -60,8 +63,86 @@ router.post("/simulation/clear", (req, res) => {
   res.json({ success: true, messages: [] });
 });
 
+router.get("/simulation/languages", (req, res) => {
+  res.json(simulationLanguages);
+});
+
+router.post("/simulation/languages", (req, res) => {
+  const { langA, langB } = req.body;
+  if (langA) simulationLanguages.langA = langA;
+  if (langB) simulationLanguages.langB = langB;
+  res.json(simulationLanguages);
+});
+
+// --- Multilingual Boardroom Endpoints ---
+router.get("/boardroom/users", (req, res) => {
+  res.json(boardroomUsers);
+});
+
+router.post("/boardroom/users", (req, res) => {
+  const { username, preferredLanguage } = req.body;
+  if (!username) {
+    res.status(400).json({ error: "Username is required" });
+    return;
+  }
+  
+  // Look for existing user with match name
+  let user = boardroomUsers.find(u => u.username.toLowerCase() === username.trim().toLowerCase());
+  if (user) {
+    user.preferredLanguage = preferredLanguage;
+  } else {
+    user = {
+      id: "u_" + Math.random().toString(36).substring(2, 9),
+      username: username.trim(),
+      preferredLanguage,
+      joinedAt: Date.now()
+    };
+    boardroomUsers.push(user);
+  }
+  res.json(user);
+});
+
+router.post("/boardroom/leave", (req, res) => {
+  const { username } = req.body;
+  if (username) {
+    boardroomUsers = boardroomUsers.filter(u => u.username.toLowerCase() !== username.trim().toLowerCase());
+  }
+  res.json({ success: true, users: boardroomUsers });
+});
+
+router.get("/boardroom/messages", (req, res) => {
+  res.json(boardroomMessages);
+});
+
+router.post("/boardroom/messages", (req, res) => {
+  const { senderName, originalText, originalLanguage, simpleExplanation } = req.body;
+  if (!senderName || !originalText || !originalLanguage) {
+    res.status(400).json({ error: "Missing sender, message, or language context" });
+    return;
+  }
+
+  const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const newMsg: BoardroomMessage = {
+    id: "br_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
+    senderName,
+    originalText,
+    originalLanguage,
+    timestamp: timeString,
+    simpleExplanation
+  };
+
+  boardroomMessages.push(newMsg);
+  res.json(newMsg);
+});
+
+router.post("/boardroom/clear", (req, res) => {
+  boardroomMessages = [];
+  res.json({ success: true, messages: [] });
+});
+
 // --- Translation APIs ---
 router.post("/translate", validate(TranslateSchema), TranslationController.translate);
+router.post("/translate-batch", TranslationController.translateBatch);
 router.post("/detect-language", validate(DetectLanguageSchema), TranslationController.detectLanguage);
 router.post("/translate-audio", validate(TranslateAudioSchema), TranslationController.translateAudio);
 router.post("/tts", validate(TTSSchema), TranslationController.textToSpeech);

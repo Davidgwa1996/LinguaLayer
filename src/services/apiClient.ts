@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { TranslationRequest, TranslationResponse, AudioTranslationResponse, UserProfile, ContactLanguageProfile } from "../types/index.ts";
+import { TranslationRequest, TranslationResponse, AudioTranslationResponse, UserProfile, ContactLanguageProfile, ChatMessage } from "../types/index.ts";
 
 export class ApiClient {
   private static baseUrl = "/api";
@@ -48,6 +48,16 @@ export class ApiClient {
     return this.handleResponse<TranslationResponse>(response, "Translation failed on server side.");
   }
 
+  static async translateBatch(req: import("../types/index.ts").BatchTranslationRequest): Promise<import("../types/index.ts").BatchTranslationResponse> {
+    const response = await fetch(`${this.baseUrl}/translate-batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+    });
+    
+    return this.handleResponse<import("../types/index.ts").BatchTranslationResponse>(response, "Batch translation failed on server side.");
+  }
+
   static async detectLanguage(text: string): Promise<string> {
     try {
       const response = await fetch(`${this.baseUrl}/detect-language`, {
@@ -73,11 +83,11 @@ export class ApiClient {
     }
   }
 
-  static async translateAudio(audioBase64: string, mimeType: string, targetLanguage: string): Promise<AudioTranslationResponse> {
+  static async translateAudio(audioBase64: string, mimeType: string, targetLanguage: string, localTranscript?: string): Promise<AudioTranslationResponse> {
     const response = await fetch(`${this.baseUrl}/translate-audio`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioBase64, mimeType, targetLanguage }),
+      body: JSON.stringify({ audioBase64, mimeType, targetLanguage, localTranscript }),
     });
 
     return this.handleResponse<AudioTranslationResponse>(response, "Audio translation engine timed out.");
@@ -135,7 +145,7 @@ export class ApiClient {
   }
 
   // --- Real-Time Simulation Sync (Supports Multi-Device testing e.g. Laptop + Phone) ---
-  static async getSimulationMessages(): Promise<ConversationMessage[]> {
+  static async getSimulationMessages(): Promise<ChatMessage[]> {
     const response = await fetch(`${this.baseUrl}/simulation/messages`);
     if (!response.ok) {
       throw new Error("Failed to pull simulation stream.");
@@ -143,7 +153,7 @@ export class ApiClient {
     return response.json();
   }
 
-  static async addSimulationMessage(msg: Partial<ConversationMessage>): Promise<ConversationMessage> {
+  static async addSimulationMessage(msg: Partial<ChatMessage>): Promise<ChatMessage> {
     const response = await fetch(`${this.baseUrl}/simulation/messages`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -157,6 +167,83 @@ export class ApiClient {
 
   static async clearSimulationMessages(): Promise<boolean> {
     const response = await fetch(`${this.baseUrl}/simulation/clear`, {
+      method: "POST",
+    });
+    return response.ok;
+  }
+
+  static async getSimulationLanguages(): Promise<{ langA: string; langB: string }> {
+    const response = await fetch(`${this.baseUrl}/simulation/languages`);
+    if (!response.ok) {
+      throw new Error("Failed to load synchronized languages.");
+    }
+    return response.json();
+  }
+
+  static async saveSimulationLanguages(languages: { langA?: string; langB?: string }): Promise<{ langA: string; langB: string }> {
+    const response = await fetch(`${this.baseUrl}/simulation/languages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(languages)
+    });
+    if (!response.ok) {
+      throw new Error("Failed to save synchronized languages.");
+    }
+    return response.json();
+  }
+
+  // --- Multilingual Boardroom Client Endpoints ---
+  static async getBoardroomUsers(): Promise<any[]> {
+    const response = await fetch(`${this.baseUrl}/boardroom/users`);
+    if (!response.ok) {
+      throw new Error("Failed to load Ballroom users roster.");
+    }
+    return response.json();
+  }
+
+  static async joinBoardroom(username: string, preferredLanguage: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/boardroom/users`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, preferredLanguage })
+    });
+    if (!response.ok) {
+      throw new Error("Failed to join Ballroom.");
+    }
+    return response.json();
+  }
+
+  static async leaveBoardroom(username: string): Promise<boolean> {
+    const response = await fetch(`${this.baseUrl}/boardroom/leave`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username })
+    });
+    return response.ok;
+  }
+
+  static async getBoardroomMessages(): Promise<any[]> {
+    const response = await fetch(`${this.baseUrl}/boardroom/messages`);
+    if (!response.ok) {
+      throw new Error("Failed to load Boardroom conversation index.");
+    }
+    return response.json();
+  }
+
+  static async sendBoardroomMessage(msg: { senderName: string; originalText: string; originalLanguage: string; simpleExplanation?: string }): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/boardroom/messages`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(msg)
+    });
+    if (!response.ok) {
+      throw new Error("Failed to broadcast Boardroom message.");
+    }
+    return response.json();
+  }
+
+  static async clearBoardroom(): Promise<boolean> {
+    const response = await fetch(`${this.baseUrl}/boardroom/clear`, {
       method: "POST",
     });
     return response.ok;

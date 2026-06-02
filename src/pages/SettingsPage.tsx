@@ -3,11 +3,13 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import LanguageSelector from "../components/LanguageSelector.tsx";
 import SimpleModeToggle from "../components/SimpleModeToggle.tsx";
 import { UserProfile } from "../types/index.ts";
-import { Settings, User, Save, Trash2, ShieldAlert } from "lucide-react";
+import { Settings, User, Save, Trash2, ShieldAlert, LogOut } from "lucide-react";
+import { getCurrentAuthUser, logoutSession } from "../services/authService.ts";
+import type { User as FirebaseAuthUser } from "firebase/auth";
 
 interface SettingsPageProps {
   id?: string;
@@ -24,6 +26,11 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   simpleMode,
   onToggleSimpleMode,
 }) => {
+  const [authUser, setAuthUser] = useState<FirebaseAuthUser | null>(null);
+
+  useEffect(() => {
+    getCurrentAuthUser().then(user => setAuthUser(user)).catch(() => {});
+  }, []);
   
   const handlePreferredLangChange = (lang: string) => {
     onUpdateSettings({ preferredLanguage: lang });
@@ -36,6 +43,13 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
   const handleWipeData = () => {
     if (confirm("Are you sure you want to delete all offline cache and custom language configurations from this browser?")) {
       localStorage.clear();
+      window.location.reload();
+    }
+  };
+
+  const handleLogout = async () => {
+    if (confirm("Are you sure you want to sign out?")) {
+      await logoutSession();
       window.location.reload();
     }
   };
@@ -57,6 +71,22 @@ export const SettingsPage: React.FC<SettingsPageProps> = ({
           <User className="w-4 h-4 text-slate-500" />
           <span>My Profile Card</span>
         </div>
+
+        {authUser && (
+          <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">{authUser.email || "Signed in"}</p>
+              <p className="text-xs text-slate-500">Connected account</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="flex items-center space-x-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
+          </div>
+        )}
 
         {/* Home language selector */}
         <div className="w-full max-w-sm">

@@ -1,0 +1,62 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isParticipant(roomId) {
+      return exists(/databases/$(database)/documents/rooms/$(roomId)/participants/$(request.auth.uid));
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+
+      allow create, update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid;
+    }
+
+    match /rooms/{roomId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.roomId == roomId
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update: if isSignedIn() && isParticipant(roomId);
+
+      match /participants/{participantId} {
+        allow read: if isSignedIn();
+
+        allow create, update: if isSignedIn()
+          && participantId == request.auth.uid
+          && request.resource.data.uid == request.auth.uid;
+      }
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn() && isParticipant(roomId);
+
+        allow create: if isSignedIn()
+          && isParticipant(roomId)
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.roomId == roomId
+          && request.resource.data.type in ["text", "voice"];
+
+        allow update: if isSignedIn() && isParticipant(roomId);
+
+        match /reactions/{reactionUserId} {
+          allow read: if isSignedIn() && isParticipant(roomId);
+
+          allow create, update, delete: if isSignedIn()
+            && isParticipant(roomId)
+            && reactionUserId == request.auth.uid
+            && request.resource.data.uid == request.auth.uid;
+        }
+      }
+    }
+  }
+}
+

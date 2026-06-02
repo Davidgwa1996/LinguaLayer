@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, Square, Trash2, Send } from 'lucide-react';
 
-interface VoiceRecorderProps {
+interface ChatVoiceRecorderProps {
   onSend: (audioBlob: Blob, durationMs: number) => void;
   onCancel: () => void;
 }
 
-export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({ onSend, onCancel }) => {
+export const ChatVoiceRecorder: React.FC<ChatVoiceRecorderProps> = ({ onSend, onCancel }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);

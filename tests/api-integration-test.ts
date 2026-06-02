@@ -71,11 +71,11 @@ async function runIntegrationTests() {
 
     SettingsStoreService.saveSettings(testUserId, {
       preferredLanguage: "Spanish",
-      simpleMode: true,
+      simpleModeEnabled: true,
     });
     const updatedSettings = SettingsStoreService.getSettings(testUserId);
     assert(updatedSettings.preferredLanguage === "Spanish", "Settings: updates values properly");
-    assert(updatedSettings.simpleMode === true, "Settings: keeps boolean attributes updated");
+    assert(updatedSettings.simpleModeEnabled === true, "Settings: keeps boolean attributes updated");
   } catch (err: any) {
     assert(false, "Settings Store Exception", err.message);
   }
@@ -90,6 +90,7 @@ async function runIntegrationTests() {
       contactId: "c_test_01",
       name: "Gillian Alcaraz",
       preferredLanguage: "Portuguese",
+      languageCode: "pt",
       tonePreference: "friendly" as const,
       autoTranslate: true,
     };

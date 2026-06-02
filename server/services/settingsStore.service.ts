@@ -10,7 +10,7 @@ const settingsStore: Record<string, UserProfile> = {
   "default-user": {
     userId: "default-user",
     preferredLanguage: "English",
-    simpleMode: false,
+    simpleModeEnabled: false,
     privacyHistoryConsent: false
   }
 };
@@ -21,6 +21,7 @@ const contactsStore: Record<string, ContactLanguageProfile[]> = {
       contactId: "c1",
       name: "Jean (French)",
       preferredLanguage: "French",
+      languageCode: "fr",
       tonePreference: "friendly",
       autoTranslate: true
     },
@@ -28,6 +29,7 @@ const contactsStore: Record<string, ContactLanguageProfile[]> = {
       contactId: "c2",
       name: "Mei (Chinese)",
       preferredLanguage: "Chinese",
+      languageCode: "zh-CN",
       tonePreference: "business",
       autoTranslate: true
     },
@@ -35,6 +37,7 @@ const contactsStore: Record<string, ContactLanguageProfile[]> = {
       contactId: "c3",
       name: "Omar (Arabic)",
       preferredLanguage: "Arabic",
+      languageCode: "ar",
       tonePreference: "respectful",
       autoTranslate: true
     }
@@ -47,7 +50,7 @@ export class SettingsStoreService {
       settingsStore[userId] = {
         userId,
         preferredLanguage: "English",
-        simpleMode: false,
+        simpleModeEnabled: false,
         privacyHistoryConsent: false
       };
     }

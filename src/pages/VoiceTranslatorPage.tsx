@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useRef } from "react";
-import VoiceRecorder from "../components/VoiceRecorder.tsx";
+import { VoiceRecorder } from "../components/VoiceRecorder.tsx";
 import { AudioTranslationResponse } from "../types/index.ts";
 import { PlayCircle, ShieldAlert, Sparkles, Volume2, Mic, Upload, FileAudio, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import LanguageSelector from "../components/LanguageSelector.tsx";
@@ -139,6 +139,31 @@ export const VoiceTranslatorPage: React.FC<VoiceTranslatorPageProps> = ({
     }
   };
 
+  const handleVoiceRecordSend = async (blob: Blob) => {
+    if (!privacyConsent) {
+      setConsentWarning(true);
+      return;
+    }
+    
+    setUploadError(null);
+    setUploadStatus("reading");
+    
+    try {
+      const base64Data = await fileToBase64(new File([blob], "recording.webm", { type: blob.type }));
+      setUploadStatus("translating");
+      
+      const mimeType = blob.type || "audio/webm";
+      const translationRes = await ApiClient.translateAudio(base64Data, mimeType, targetLang);
+      
+      handleTranslationComplete(translationRes);
+      setUploadStatus("idle");
+    } catch (err) {
+      console.error(err);
+      setUploadError(err instanceof Error ? err.message : "Failure executing AI Translation on recorded audio.");
+      setUploadStatus("error");
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       processAudioFile(e.target.files[0]);
@@ -240,10 +265,8 @@ export const VoiceTranslatorPage: React.FC<VoiceTranslatorPageProps> = ({
       {activeTab === "record" ? (
         /* Audio Recorder node */
         <VoiceRecorder
-          targetLanguage={targetLang}
-          consentedToPrivacy={privacyConsent}
-          onRequestConsent={() => setConsentWarning(true)}
-          onTranslationComplete={handleTranslationComplete}
+          onSend={handleVoiceRecordSend}
+          onCancel={() => {}}
         />
       ) : (
         /* Native Drag-and-drop Audio File Uploader card */

@@ -39,9 +39,11 @@ export const validate = (schema: z.ZodTypeAny) => {
 export const TranslateSchema = z.object({
   body: z.object({
     sourceText: z.string().min(1, "sourceText parameter is required and cannot be empty."),
-    sourceLanguage: z.string().optional().default("auto"),
-    targetLanguage: z.string().optional().default("English"),
-    userLanguage: z.string().optional().default("English"),
+    sourceLanguage: z.string(),
+    sourceLanguageCode: z.string().optional(),
+    targetLanguage: z.string().optional(),
+    targetLanguageCode: z.string().optional(),
+    receiverId: z.string().optional(),
     conversationContext: z
       .array(
         z.object({
@@ -55,8 +57,6 @@ export const TranslateSchema = z.object({
       .enum(["neutral", "friendly", "formal", "business", "simple", "respectful", "casual"])
       .optional(),
     mode: z.enum(["normal", "business", "simple"]).optional(),
-    preserveOriginal: z.boolean().optional(),
-    simpleExplanation: z.boolean().optional(),
   }),
 });
 
@@ -71,6 +71,7 @@ export const TranslateAudioSchema = z.object({
     audioBase64: z.string().min(1, "audioBase64 payload is required."),
     mimeType: z.string().optional().default("audio/webm"),
     targetLanguage: z.string().optional().default("English"),
+    localTranscript: z.string().optional(),
   }),
 });
 

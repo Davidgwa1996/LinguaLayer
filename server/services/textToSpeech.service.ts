@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, Modality } from "@google/genai";
-import { getCleanApiKey } from "./geminiTranslation.service.ts";
+import { getCleanApiKey, markApiKeyLeaked } from "./geminiTranslation.service.ts";
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -52,7 +52,18 @@ export class TextToSpeechService {
         throw new Error("No audio payload returned from Gemini TTS engine.");
       }
       return base64Audio;
-    } catch (error) {
+    } catch (error: any) {
+      const errorStr = String(error?.message || error || "");
+      if (
+        errorStr.includes("leaked") || 
+        errorStr.includes("PERMISSION_DENIED") || 
+        errorStr.includes("unauthorized") ||
+        errorStr.includes("API key not valid") || 
+        errorStr.includes("403")
+      ) {
+        console.warn("Detected blocked/leaked key in textToSpeech catch. Setting leak flag.");
+        markApiKeyLeaked();
+      }
       console.error("Gemini TTS engine error:", error);
       throw error;
     }

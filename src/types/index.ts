@@ -4,58 +4,122 @@
  */
 
 export interface UserProfile {
-  userId: string;
+  id?: "dave" | "peter" | string;
+  name?: string;
+  userId?: string;
   preferredLanguage: string;
-  simpleMode: boolean;
-  privacyHistoryConsent: boolean;
+  languageCode?: string;
+  simpleModeEnabled?: boolean;
+  voiceModeEnabled?: boolean;
+  privacyHistoryConsent?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ContactLanguageProfile {
-  contactId: string;
-  name: string;
+  id?: string;
+  contactId?: string;
+  contactName?: string;
+  name?: string; // backwards compatibility
   preferredLanguage: string;
-  tonePreference: 'neutral' | 'friendly' | 'formal' | 'business' | 'simple' | 'respectful' | 'casual';
-  autoTranslate: boolean;
+  languageCode: string;
+  tonePreference?: 'neutral' | 'friendly' | 'formal' | 'business' | 'simple' | 'respectful' | 'casual';
+  autoTranslate?: boolean;
+  lastUsedAt?: string;
 }
 
-export interface ConversationMessage {
+export interface Conversation {
+  id?: string;
+  participantIds: string[];
+  createdAt: string;
+  updatedAt: string;
+  mode?: string;
+}
+
+export interface ChatMessage {
   id: string;
-  sender: 'A' | 'B';
+  senderId: string;
   originalText: string;
-  translatedText: string;
-  sourceLanguage: string;
-  targetLanguage: string;
-  timestamp: string;
-  simpleExplanation?: string;
-  preservedTerms?: string[];
-  warning?: string | null;
-  otherTranslations?: Record<string, string>;
+  originalLanguage: string;
+  originalLanguageCode: string;
+  originalLanguageName?: string;
+  senderLanguageCode?: string;
+  senderLanguageName?: string;
+  roomId?: string;
+  createdAt: string;
+  type?: 'text' | 'voice';
+  voiceUrl?: string;
+  voicePath?: string;
+  voiceDurationMs?: number;
+  transcript?: string;
+  pinned?: boolean;
+  reactions?: Record<string, string[]>;
+  readBy?: string[];
+  translations: Record<string, {
+    targetLanguage: string;
+    targetLanguageCode: string;
+    translatedText: string;
+    confidence?: number;
+    warning?: string | null;
+    ambiguity?: string | null;
+    status?: "pending" | "ready" | "failed";
+  }>;
 }
 
 export interface TranslationRequest {
   sourceText: string;
-  sourceLanguage: string; // "auto" or language name
+  sourceLanguage: string;
+  sourceLanguageCode?: string;
   targetLanguage: string;
-  userLanguage: string;
-  conversationContext?: { speaker: string; language: string; text: string }[];
+  targetLanguageCode?: string;
+  receiverId?: string;
+  userLanguage?: string;
   tone?: 'neutral' | 'friendly' | 'formal' | 'business' | 'simple' | 'respectful' | 'casual';
   mode?: 'normal' | 'business' | 'simple';
   preserveOriginal?: boolean;
   simpleExplanation?: boolean;
+  conversationContext?: { speaker: string; language: string; text: string }[];
+}
+
+export interface BatchTranslationRequestItem {
+  id: string; // Message ID or temporary ID
+  sourceText: string;
+  sourceLanguageCode: string;
+  sourceLanguage?: string;
+  targetLanguageCode: string;
+  targetLanguage?: string;
+}
+
+export interface BatchTranslationRequest {
+  items: BatchTranslationRequestItem[];
+  mode?: "normal" | "simple";
+}
+
+export interface BatchTranslationResponse {
+  results: Array<{
+    id: string;
+    translatedText: string;
+    confidence: number;
+    targetLanguageCode: string;
+    warning?: string | null;
+    ambiguity?: string | null;
+  }>;
 }
 
 export interface TranslationResponse {
-  detectedLanguage: string;
-  sourceLanguage: string;
+  detectedSourceLanguage: string;
+  detectedSourceLanguageCode: string;
   targetLanguage: string;
+  targetLanguageCode: string;
   translatedText: string;
-  simpleExplanation?: string;
-  toneUsed: string;
-  preservedTerms: string[];
   confidence: number;
   warning: string | null;
-  sensitiveContentFlag: boolean;
-  otherTranslations?: Record<string, string>;
+  simpleExplanation?: string;
+  preservedTerms?: string[];
+  sensitiveContentFlag?: boolean;
+  detectedLanguage?: string;
+  toneUsed?: string;
+  ambiguity?: string | null;
 }
 
 export interface AudioTranslationResponse {
@@ -67,4 +131,20 @@ export interface AudioTranslationResponse {
   confidence: number;
   warning: string | null;
   audioOutputUrl: string | null;
+}
+
+export interface BoardroomUser {
+  id: string;
+  username: string;
+  preferredLanguage: string;
+  joinedAt: number;
+}
+
+export interface BoardroomMessage {
+  id: string;
+  senderName: string;
+  originalText: string;
+  originalLanguage: string;
+  timestamp: string;
+  simpleExplanation?: string;
 }

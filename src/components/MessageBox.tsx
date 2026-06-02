@@ -11,6 +11,7 @@ import ToneSelector from "./ToneSelector.tsx";
 interface MessageBoxProps {
   id?: string;
   onTranslate: (text: string, sourceLang: string, targetLang: string, tone: string) => void;
+  onTextChange?: (text: string, sourceLang: string, targetLang: string, tone: string) => void;
   isLoading: boolean;
   defaultSourceLang?: string;
   defaultTargetLang?: string;
@@ -20,6 +21,7 @@ interface MessageBoxProps {
 export const MessageBox: React.FC<MessageBoxProps> = ({
   id,
   onTranslate,
+  onTextChange,
   isLoading,
   defaultSourceLang = "English",
   defaultTargetLang = "Chinese",
@@ -39,10 +41,12 @@ export const MessageBox: React.FC<MessageBoxProps> = ({
   const handleSwap = () => {
     if (sourceLang === "auto") {
       setSourceLang("English");
+      onTextChange?.(text, "English", targetLang, tone);
     } else {
       const prevSource = sourceLang;
       setSourceLang(targetLang);
       setTargetLang(prevSource);
+      onTextChange?.(text, targetLang, prevSource, tone);
     }
   };
 
@@ -56,7 +60,10 @@ export const MessageBox: React.FC<MessageBoxProps> = ({
             <LanguageSelector
               label={simpleMode ? "My Language" : "Source Language"}
               selectedLanguage={sourceLang}
-              onChange={setSourceLang}
+              onChange={(lang) => {
+                setSourceLang(lang);
+                onTextChange?.(text, lang, targetLang, tone);
+              }}
               autoOption={true}
             />
           </div>
@@ -74,7 +81,10 @@ export const MessageBox: React.FC<MessageBoxProps> = ({
             <LanguageSelector
               label={simpleMode ? "Their Language" : "Target Language"}
               selectedLanguage={targetLang}
-              onChange={setTargetLang}
+              onChange={(lang) => {
+                setTargetLang(lang);
+                onTextChange?.(text, sourceLang, lang, tone);
+              }}
             />
           </div>
         </div>
@@ -86,7 +96,11 @@ export const MessageBox: React.FC<MessageBoxProps> = ({
           </label>
           <textarea
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setText(val);
+              onTextChange?.(val, sourceLang, targetLang, tone);
+            }}
             placeholder="Type your message here..."
             className="w-full p-4 h-32 rounded-2xl border border-slate-200 text-slate-800 focus:border-slate-400 focus:outline-none transition-all placeholder-slate-400 text-sm md:text-base font-sans resize-none"
             required
@@ -96,7 +110,10 @@ export const MessageBox: React.FC<MessageBoxProps> = ({
         {/* Tone Selection (hidden in simple mode to avoid choice overload) */}
         {!simpleMode && (
           <div className="pt-1">
-            <ToneSelector selectedTone={tone} onChange={setTone} />
+            <ToneSelector selectedTone={tone} onChange={(newTone) => {
+              setTone(newTone);
+              onTextChange?.(text, sourceLang, targetLang, newTone);
+            }} />
           </div>
         )}
 

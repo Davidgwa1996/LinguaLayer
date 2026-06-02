@@ -33,39 +33,19 @@ export class TranslationController {
       const translation = await GeminiTranslationService.translateText({
         sourceText,
         sourceLanguage,
+        sourceLanguageCode: req.body.sourceLanguageCode,
         targetLanguage,
-        userLanguage,
+        targetLanguageCode: req.body.targetLanguageCode,
         conversationContext,
         tone,
         mode,
-        preserveOriginal,
-        simpleExplanation,
       });
-
-      // Business mode safety checks or extra logs parsing
-      if (mode === "business") {
-        const extraPreserved = GlossaryService.verifyGlossary(sourceText, translation.translatedText);
-        translation.preservedTerms = [...new Set([...translation.preservedTerms, ...extraPreserved])];
-      }
 
       // Live safety scanner context
       const safetyResult = SafetyFilterService.scan(sourceText);
       if (safetyResult.flagged && !translation.warning) {
         translation.warning = safetyResult.reason;
-        translation.sensitiveContentFlag = true;
       }
-
-      // Populate otherTranslations for the game/simulator's multi-lingual casting
-      const targetLangs = ["Chinese", "French", "Spanish", "Swahili", "Arabic", "English"];
-      const otherTranslations: Record<string, string> = {};
-      for (const tgt of targetLangs) {
-        if (tgt.toLowerCase() !== (targetLanguage || "Chinese").toLowerCase()) {
-          otherTranslations[tgt] = GeminiTranslationService.getOfflineTranslationForLang(sourceText, tgt);
-        } else {
-          otherTranslations[tgt] = translation.translatedText;
-        }
-      }
-      (translation as any).otherTranslations = otherTranslations;
 
       res.json(translation);
     } catch (error: any) {
@@ -74,6 +54,61 @@ export class TranslationController {
       res.status(isQuota ? 429 : 500).json({
         error: "Translation failed",
         info: error instanceof Error ? error.message : "Unknown engine mismatch",
+        isQuota
+      });
+    }
+  }
+
+  static async translateBatch(req: Request, res: Response): Promise<void> {
+    try {
+      const { items, mode } = req.body;
+      if (!items || !Array.isArray(items)) {
+        res.status(400).json({ error: "Invalid batch request format" });
+        return;
+      }
+      
+      const results = await Promise.all(items.map(async (item) => {
+        try {
+          const translation = await GeminiTranslationService.translateText({
+            sourceText: item.sourceText,
+            sourceLanguage: item.sourceLanguage || "Unknown",
+            sourceLanguageCode: item.sourceLanguageCode,
+            targetLanguage: item.targetLanguage || "English",
+            targetLanguageCode: item.targetLanguageCode,
+            mode: mode as any
+          });
+          
+          const safetyResult = SafetyFilterService.scan(item.sourceText);
+          if (safetyResult.flagged && !translation.warning) {
+            translation.warning = safetyResult.reason;
+          }
+          
+          return {
+            id: item.id,
+            translatedText: translation.translatedText,
+            confidence: translation.confidence,
+            targetLanguageCode: item.targetLanguageCode,
+            warning: translation.warning,
+            ambiguity: translation.ambiguity
+          };
+        } catch (e: any) {
+          console.error("Batch item translation failed:", e);
+          return {
+            id: item.id,
+            translatedText: "Translation failed",
+            confidence: 0,
+            targetLanguageCode: item.targetLanguageCode,
+            warning: "Individual translation failed"
+          };
+        }
+      }));
+      
+      res.json({ results });
+    } catch (error: any) {
+      console.error("Batch Translation Endpoint Exception:", error);
+      const isQuota = error?.message?.includes("429") || error?.message?.includes("Quota exceeded") || error?.message?.includes("RESOURCE_EXHAUSTED");
+      res.status(isQuota ? 429 : 500).json({
+        error: "Batch translation failed",
         isQuota
       });
     }
@@ -99,12 +134,13 @@ export class TranslationController {
    */
   static async translateAudio(req: Request, res: Response): Promise<void> {
     try {
-      const { audioBase64, mimeType, targetLanguage } = req.body;
+      const { audioBase64, mimeType, targetLanguage, localTranscript } = req.body;
 
       const result = await AudioTranscriptionService.translateAudio(
         audioBase64,
         mimeType,
-        targetLanguage
+        targetLanguage,
+        localTranscript
       );
       res.json(result);
     } catch (error: any) {

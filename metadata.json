@@ -1,6 +1,0 @@
-{
-  "name": "LinguaLayer AI",
-  "description": "An AI-powered universal language communication layer to translate text messages, voice notes, and live conversations seamlessly between users.",
-  "requestFramePermissions": ["microphone"],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
-}

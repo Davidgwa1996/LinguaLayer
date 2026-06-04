@@ -3,6 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ShieldCheck, MessageCircle, Globe, Smartphone, Lock, Zap, CheckCircle2, ChevronRight, Settings } from 'lucide-react';
 
 export function LandingPage({ onNavigate }: { onNavigate?: (id: string) => void }) {
+  const handleLiveDemoClick = () => {
+    onNavigate?.('live-chat');
+  };
+
   return (
     <div className="w-full font-sans text-slate-900 bg-slate-50">
       {/* Hero Section */}
@@ -20,17 +24,17 @@ export function LandingPage({ onNavigate }: { onNavigate?: (id: string) => void 
           </motion.div>
           
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.5 }} className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-8">
-            <button onClick={() => onNavigate?.('live-chat')} className="px-8 py-4 bg-indigo-500 hover:bg-indigo-600 rounded-full font-bold text-white shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2">
+            <button onClick={handleLiveDemoClick} className="px-8 py-4 bg-indigo-500 hover:bg-indigo-600 rounded-full font-bold text-white shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2">
               <MessageCircle className="w-5 h-5" />
-              Open Live Chat
+              Live Demo
             </button>
             <button onClick={() => onNavigate?.('video')} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-full font-bold text-white shadow-lg transition-all flex items-center gap-2 border border-slate-700">
               <Settings className="w-5 h-5" />
               Watch Demo
             </button>
-            <button onClick={() => onNavigate?.('android')} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-full font-bold text-white shadow-lg transition-all flex items-center gap-2 border border-slate-700">
+            <button onClick={() => onNavigate?.('market-opportunity')} className="px-8 py-4 bg-slate-800 hover:bg-slate-700 rounded-full font-bold text-white shadow-lg transition-all flex items-center gap-2 border border-slate-700">
               <Smartphone className="w-5 h-5" />
-              Android/OEM Vision
+              Market Opportunity
             </button>
           </motion.div>
         </div>
@@ -42,7 +46,7 @@ export function LandingPage({ onNavigate }: { onNavigate?: (id: string) => void 
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <h2 className="text-3xl font-extrabold tracking-tight mb-4">What is LinguaLayer AI?</h2>
             <p className="text-lg text-slate-600 leading-relaxed font-medium">
-              “LinguaLayer AI is a universal language communication layer. It is designed to let people communicate naturally across languages. Each user chooses the language they understand, and messages appear in that language before they are displayed. The goal is to remove manual translation, copy-paste delays, and language barriers across messaging, social, email, and future device-level communication systems.”
+              “LinguaLayer AI is a communication layer that helps people chat naturally across different languages. Each person writes in the language they understand, while the receiver sees the message in their own selected language. It is not designed to feel like a separate translator tool. It is designed to make multilingual communication feel like normal messaging.”
             </p>
           </motion.div>
         </div>
@@ -56,11 +60,78 @@ export function LandingPage({ onNavigate }: { onNavigate?: (id: string) => void 
             <div className="p-8 bg-indigo-50 border border-indigo-100 rounded-3xl shadow-sm text-left relative overflow-hidden">
               <div className="absolute top-0 left-0 w-2 h-full bg-indigo-400"></div>
               <p className="text-lg text-indigo-900 leading-relaxed">
-                “David chooses English on his device. Peter chooses Mandarin Chinese on his device. David writes in English. Peter sees Mandarin Chinese. Peter replies in Mandarin Chinese. David sees English. Neither person opens a translator. The conversation feels natural.”
+                “I select English. A client selects Mandarin Chinese. I write in English. LinguaLayer identifies my language, checks the client's language profile, prepares the message in Mandarin Chinese, and the client sees the message directly in Mandarin Chinese. Neither person opens a translator.”
               </p>
             </div>
           </motion.div>
         </div>
+      </section>
+
+      {/* Naked Proof: Meaning Preservation */}
+      <section className="py-24 px-4 md:px-8 bg-slate-900 border-b border-slate-800 text-white">
+          <div className="max-w-6xl mx-auto text-center space-y-12">
+             <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
+                <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4">The Naked Proof</h2>
+                <p className="text-lg text-slate-400 max-w-3xl mx-auto">
+                   Translations can be risky. We never mutate the original message. Here is exactly what happens when an English speaker messages a Chinese-speaking user, and they verify the semantic fidelity using <span className="text-white font-semibold">View Original</span>.
+                </p>
+             </motion.div>
+
+             <div className="grid md:grid-cols-3 gap-6 text-left">
+                {/* Image/Mockup 1 */}
+                <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 space-y-4">
+                   <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Globe className="w-4 h-4"/> 1. Sender (English)</div>
+                   <div className="bg-slate-900 rounded-2xl p-4 shadow-inner space-y-3 h-48 flex flex-col justify-end">
+                      <div className="flex w-full justify-end">
+                         <div className="bg-indigo-600 text-white rounded-2xl rounded-tr-sm px-4 py-2 text-sm shadow-sm inline-block">
+                             The price is £5,200 for Order AB-2049-7. Do not ship before 10 July 2026.
+                         </div>
+                      </div>
+                   </div>
+                   <p className="text-sm text-slate-300">User A sends a strictly formatted business intent in English.</p>
+                </div>
+
+                {/* Image/Mockup 2 */}
+                <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 space-y-4 shadow-xl shadow-indigo-900/20 relative">
+                   <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-t-3xl"></div>
+                   <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Globe className="w-4 h-4"/> 2. Receiver (Chinese)</div>
+                   <div className="bg-slate-900 rounded-2xl p-4 shadow-inner space-y-3 h-48 flex flex-col justify-end">
+                      <div className="flex w-full justify-start">
+                         <div className="bg-slate-700 border border-slate-600 text-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm inline-block shadow-sm">
+                             <div className="flex flex-col">
+                                <span>订单 AB-2049-7 的价格为 £5,200。请勿在 2026 年 7 月 10 日前发货。</span>
+                                <button className="text-[10px] mt-2 opacity-60 hover:opacity-100 text-left underline w-fit cursor-pointer transition-opacity text-white">
+                                   View original
+                                </button>
+                             </div>
+                         </div>
+                      </div>
+                   </div>
+                   <p className="text-sm text-slate-300">User B receives the translated message. IDs, prices, and dates are perfectly preserved.</p>
+                </div>
+
+                {/* Image/Mockup 3 */}
+                <div className="bg-slate-800 rounded-3xl p-6 border border-slate-700 space-y-4 relative">
+                   <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> 3. Immutable Verification</div>
+                   <div className="bg-slate-900 rounded-2xl p-4 shadow-inner space-y-3 h-48 flex flex-col justify-end">
+                      <div className="flex w-full justify-start">
+                         <div className="bg-slate-700 border border-slate-600 text-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm inline-block shadow-sm">
+                             <div className="flex flex-col">
+                                <span>订单 AB-2049-7 的价格为 £5,200。请勿在 2026 年 7 月 10 日前发货。</span>
+                                <button className="text-[10px] mt-2 opacity-60 text-left underline w-fit text-white">
+                                   Hide original
+                                </button>
+                                <div className="mt-2 pt-2 border-t border-slate-500/50 text-[11px] italic opacity-90 break-words font-mono text-emerald-100">
+                                   EN: The price is £5,200 for Order AB-2049-7. Do not ship before 10 July 2026.
+                                </div>
+                             </div>
+                         </div>
+                      </div>
+                   </div>
+                   <p className="text-sm text-slate-300">User B clicks "View original". The <span className="font-semibold text-emerald-400">canonical source</span> is revealed exactly as sent.</p>
+                </div>
+             </div>
+          </div>
       </section>
 
       {/* PART 1: Enable in Settings */}
@@ -307,16 +378,8 @@ export function LandingPage({ onNavigate }: { onNavigate?: (id: string) => void 
               </div>
            </div>
 
-           <div className="pt-24 pb-16 border-t border-slate-800/50 mt-16">
-              <h3 className="text-3xl font-extrabold text-white mb-8">Write naturally. Read naturally. Connect globally.</h3>
-              <div className="flex flex-wrap justify-center gap-4">
-                 <button onClick={() => onNavigate?.('video')} className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 rounded-full font-bold text-white shadow-lg transition-all">
-                    Watch Video Demo
-                 </button>
-                 <button onClick={() => onNavigate?.('live-chat')} className="px-6 py-3 bg-slate-800 hover:bg-slate-700 rounded-full font-bold text-white border border-slate-700 transition-all">
-                    Open Live Chat
-                 </button>
-              </div>
+           <div className="pt-24 pb-16 border-t border-slate-800/50 mt-16 flex justify-center">
+              <h3 className="text-3xl font-extrabold text-white mb-8 text-center max-w-2xl mx-auto">Write naturally. Read naturally. Connect globally.</h3>
            </div>
         </div>
       </section>

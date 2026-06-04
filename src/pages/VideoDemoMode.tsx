@@ -260,9 +260,9 @@ export function VideoDemoMode() {
         />
         
         {/* Caption Overlay */}
-        <div className="absolute bottom-28 md:bottom-32 left-0 w-full px-4 md:px-12 z-10 pointer-events-none transition-all duration-300 flex flex-col justify-end items-center">
+        <div className="absolute bottom-12 md:bottom-16 left-0 w-full px-2 md:px-12 z-10 pointer-events-none transition-all duration-300 flex flex-col justify-end items-center pb-4">
            {activeCaption && (
-             <div className="bg-black/80 text-white px-4 md:px-6 py-2 md:py-3 rounded shadow-2xl backdrop-blur-md text-sm md:text-base font-semibold max-w-[90%] md:max-w-2xl text-center border border-white/20 animate-fade-in mx-auto">
+             <div className="bg-black/85 text-white px-4 md:px-6 py-2 md:py-3 rounded-lg shadow-2xl backdrop-blur-md text-xs sm:text-sm md:text-base font-medium max-w-[95%] md:max-w-xl text-center animate-fade-in mx-auto border-b-2 border-indigo-500">
                {activeCaption.text}
              </div>
            )}

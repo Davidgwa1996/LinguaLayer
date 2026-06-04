@@ -13,47 +13,207 @@ async function startServer() {
   // API Route for translation
   app.post("/api/translate", async (req, res) => {
     try {
-      const { sourceText, targetLanguage, targetLanguageName, sourceLanguageName } = req.body;
+      const { sourceText, targetLanguage, targetLanguageName, sourceLanguage, sourceLanguageName } = req.body;
       if (!sourceText || !targetLanguage) {
         return res.status(400).json({ error: "Missing parameters" });
       }
 
-      if (!process.env.GEMINI_API_KEY) {
+      if (sourceLanguage === targetLanguage) {
+        return res.json({ translatedText: sourceText });
+      }
+
+      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.trim() === "") {
          // Fallback to mymemory if gemini isn't configured
-         const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sourceText)}&langpair=autodetect|${targetLanguage}`;
-         const fallbackRes = await fetch(url);
-         const fallbackData = await fallbackRes.json();
-         return res.json({ translatedText: fallbackData?.responseData?.translatedText || sourceText });
+         try {
+           const fallbackSource = sourceLanguage || "autodetect";
+           const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sourceText)}&langpair=${fallbackSource}|${targetLanguage}`;
+           const fallbackRes = await fetch(url);
+           if (!fallbackRes.ok) throw new Error("MyMemory non-OK");
+           const fallbackData = await fallbackRes.json();
+           const fallbackText = fallbackData?.responseData?.translatedText;
+           if (fallbackText && !fallbackText.includes("MYMEMORY WARNING")) {
+             return res.json({ translatedText: fallbackText });
+           }
+         } catch (e) {
+           console.error("MyMemory fallback failed:", e);
+         }
+         return res.json({ translatedText: "Configuration Error: Please add a valid Gemini API key to enable AI Delivery processing." });
+      }
+
+      try {
+        const { GoogleGenAI } = await import("@google/genai");
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        // Use gemini for superior translation
+        const sourceStr = sourceLanguageName ? `from ${sourceLanguageName}` : (sourceLanguage ? `from ${sourceLanguage}` : 'the sender');
+        const prompt = `You are a strict, fidelity-first translation engine for real communication, not a paraphrasing assistant.
+Translate the following message ${sourceStr} into the target language: ${targetLanguageName || targetLanguage}.
+PRESERVE the original meaning exactly.
+DO NOT add information. DO NOT omit information. DO NOT soften, intensify, summarise, explain, or normalise the message.
+PRESERVE question/statement form, negation, intent, names, numbers, dates, prices, units, product names, tracking numbers, and domain-specific terms.
+If the source message is ambiguous and the intended meaning is not clear from context, return LOW_CONFIDENCE instead of guessing.
+
+IMPORTANT: Do not output any explanation, markdown, or quotes unless they were in the original text. Output ONLY the strict translation.
+
+Text: ${sourceText}`;
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: prompt,
+          config: {
+            temperature: 0,
+            maxOutputTokens: 256
+          }
+        });
+        
+        const translatedText = response.text?.trim();
+        if (translatedText) {
+          return res.json({ translatedText });
+        }
+      } catch (geminiError) {
+        console.error("Gemini Translation Error, falling back:", geminiError);
+      }
+      
+      // Fallback if Gemini fails, is invalid, or returns empty
+      try {
+        const fallbackSource = sourceLanguage || "autodetect";
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sourceText)}&langpair=${fallbackSource}|${targetLanguage}`;
+        const fallbackRes = await fetch(url);
+        if (!fallbackRes.ok) {
+           throw new Error("MyMemory API returned non-OK status");
+        }
+        const fallbackData = await fallbackRes.json();
+        const fallbackText = fallbackData?.responseData?.translatedText;
+        
+        if (fallbackText && !fallbackText.includes("MYMEMORY WARNING")) {
+          return res.json({ translatedText: fallbackText });
+        } else {
+          return res.json({ translatedText: "Configuration Error: Please add a valid Gemini API key to enable AI Delivery processing." });
+        }
+      } catch (fallbackError) {
+        console.error("Fallback Translation Error:", fallbackError);
+        return res.json({ translatedText: "Configuration Error: Please add a valid Gemini API key to enable AI Delivery processing." });
+      }
+
+    } catch (error) {
+      console.error("Translation API Error:", error);
+      res.status(500).json({ error: "Failed to translate" });
+    }
+  });
+
+  // Batch Translation API
+  app.post("/api/translate-batch", async (req, res) => {
+    try {
+      const { messages, targetLanguage, targetLanguageName } = req.body;
+      if (!messages || !Array.isArray(messages) || !targetLanguage) {
+        return res.status(400).json({ error: "Missing parameters" });
+      }
+
+      if (messages.length === 0) {
+        return res.json({ translatedTexts: {} });
+      }
+
+      // If Gemini is available, try robust translation
+      if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim() !== "") {
+        try {
+          const { GoogleGenAI } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+          
+          const prompt = `You are a strict, fidelity-first translation engine, not a paraphrasing assistant.
+Your job is to translate these messages into ${targetLanguageName || targetLanguage}. 
+DO NOT mutate the original meaning. DO NOT guess silently if ambiguous.
+You must extract and protect spans (names, numbers, IDs, dates, prices) so they remain EXACTLY intact.
+Preserve tone, negation, question marks, and business intent perfectly.
+
+For each message, generate a translation, and do a verification step internally before output.
+Return ONLY a valid JSON object mapping the exact same message IDs to their translated text.
+Example format:
+{
+  "msg-123": "Translated text preserving all IDs and meaning",
+  "msg-456": "Another translated message"
+}
+
+Do not format as markdown, just output raw JSON.
+
+Messages:
+${JSON.stringify(messages)}`;
+
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: { temperature: 0, responseMimeType: "application/json" }
+          });
+          
+          const translatedTexts = JSON.parse(response.text?.trim() || "{}");
+          if (Object.keys(translatedTexts).length > 0) {
+             return res.json({ translatedTexts });
+          }
+        } catch (geminiError) {
+          console.error("Batch Gemini Error, falling back to MyMemory:", geminiError);
+        }
+      }
+
+      // Fallback to MyMemory
+      const translatedTexts: Record<string, string> = {};
+      await Promise.all(messages.map(async (msg) => {
+          try {
+             if (msg.lang === targetLanguage) {
+                 translatedTexts[msg.id] = msg.text;
+                 return;
+             }
+             const fallbackSource = msg.lang || "autodetect";
+             const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(msg.text)}&langpair=${fallbackSource}|${targetLanguage}`;
+             const fallbackRes = await fetch(url);
+             if (!fallbackRes.ok) throw new Error("MyMemory non-OK");
+             const fallbackData = await fallbackRes.json();
+             const fallbackText = fallbackData?.responseData?.translatedText;
+             if (fallbackText && !fallbackText.includes("MYMEMORY WARNING")) {
+                 translatedTexts[msg.id] = fallbackText;
+             } else {
+                 translatedTexts[msg.id] = "Configuration Error: Please add a valid Gemini API key.";
+             }
+          } catch (e) {
+             translatedTexts[msg.id] = "Configuration Error: Please add a valid Gemini API key.";
+          }
+      }));
+
+      return res.json({ translatedTexts });
+    } catch (error) {
+      console.error("Batch Translation API Error:", error);
+      res.status(500).json({ error: "Failed to translate batch" });
+    }
+  });
+
+  // API Route for Text Prediction & Spell check
+  app.post("/api/predict", async (req, res) => {
+    try {
+      const { text, language } = req.body;
+      if (!text) return res.json({ suggestion: "" });
+      
+      if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY.trim() === "") {
+         return res.json({ suggestion: "" });
       }
 
       const { GoogleGenAI } = await import("@google/genai");
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      // Use gemini for superior translation
-      const sourceStr = sourceLanguageName ? `from ${sourceLanguageName}` : 'the sender';
-      const prompt = `You are LinguaLayer AI’s Language Delivery Engine.
-Your job is to prepare ${sourceStr}’s message for display in the receiver’s selected language: ${targetLanguageName || targetLanguage}.
-Preserve the sender’s meaning exactly.
-Do not add information.
-Do not remove information.
-Do not rewrite the user’s intention.
-Do not make unclear statements certain.
-Do not turn questions into statements.
-Do not turn requests into promises.
-Preserve names, numbers, dates, prices, addresses, phone numbers, product names, and business terms.
-If the source message is unclear, preserve the uncertainty in the receiver language.
-Only return the translated text without any quotes, explanations, or markdown formatting.
+      
+      const prompt = `You are a real-time typing assistant for a chat application.
+The user is typing in ${language || 'English'}.
+Current input: "${text}"
 
-Text: ${sourceText}`;
+Provide a brief, natural continuation (prediction) of what they might type next, OR correct their spelling/grammar if it's obviously wrong.
+Wait, if it's correct, just suggest the next 1-3 words.
+Return ONLY the suggested addition or the corrected full text. If you return an addition, just return the next words (nothing else).
+Limit your response to a maximum of 3-5 words. Do not format as markdown.`;
+
       const response = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: prompt
+        contents: prompt,
+        config: { temperature: 0.1, maxOutputTokens: 20 }
       });
       
-      const translatedText = response.text?.trim() || sourceText;
-      return res.json({ translatedText });
+      let suggestion = response.text?.trim() || "";
+      return res.json({ suggestion });
     } catch (error) {
-      console.error("Translation API Error:", error);
-      res.status(500).json({ error: "Failed to translate" });
+      return res.json({ suggestion: "" });
     }
   });
 

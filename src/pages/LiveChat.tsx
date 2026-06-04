@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { MessageSquare, Globe, Link as LinkIcon, Copy, Users, Send, Check, LogOut, ArrowLeft } from 'lucide-react';
+import { MessageSquare, Globe, Link as LinkIcon, Copy, Users, Send, Check, LogOut, ArrowLeft, Smile } from 'lucide-react';
 import { db, auth } from '../lib/firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, limit, serverTimestamp, doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { SUPPORTED_LANGUAGES } from '../supportedLanguages';
 import { prepareMessageDelivery } from '../translationService';
+import { useAuth } from '../lib/AuthContext';
+import debounce from 'lodash/debounce';
+import EmojiPicker from 'emoji-picker-react';
 
 export function LiveChat() {
   const [roomId, setRoomId] = useState<string | null>(() => localStorage.getItem('activeRoomId'));
@@ -33,19 +36,23 @@ export function LiveChat() {
     return newId;
   });
   const [activeTypers, setActiveTypers] = useState<Record<string, any>>({});
+  const [showingOriginals, setShowingOriginals] = useState<Record<string, boolean>>({});
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
   
+  const { user, loading: authContextLoading, signInWithGoogle } = useAuth();
+  
   useEffect(() => {
-    const unsubscribe = auth?.onAuthStateChanged((u) => {
-      const email = u?.email?.toLowerCase();
+    if (user) {
+      const email = user.email?.toLowerCase();
       setIsAdmin(email === 'njaudavid5@gmail.com' || email === 'njaudavid5@mail.com');
-      setTimeout(() => setAuthLoading(false), 50);
-    });
-    return () => unsubscribe && unsubscribe();
-  }, []);
+      setAuthLoading(false);
+    } else if (!authContextLoading) {
+      setAuthLoading(false);
+    }
+  }, [user, authContextLoading]);
 
   const [messageHistory, setMessageHistory] = useState<any[]>(() => {
     try {
@@ -63,6 +70,15 @@ export function LiveChat() {
   const [pendingRoomId, setPendingRoomId] = useState<string | null>(() => localStorage.getItem('pendingRoomId'));
   const [roomStatus, setRoomStatus] = useState<'active'|'ended'|null>(null);
   const [statusLoading, setStatusLoading] = useState(false);
+  
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   useEffect(() => {
     // Only check if we are considering joining
@@ -108,22 +124,39 @@ export function LiveChat() {
     bc.onmessage = (e) => {
       setMessages(prev => {
         if (prev.some(m => m.id === e.data.id)) return prev;
+        
+        if (!mySentMessagesRef.current.has(e.data.id) && e.data.type !== 'system') {
+           setToastMessage("New message received! 🔔");
+        }
+
         return [...prev, e.data].sort((a,b) => a.timestamp - b.timestamp);
       });
     };
 
     let unsubscribeMessages = () => {};
     let unsubscribeRoom = () => {};
+    let isInitialLoad = true;
 
     if (db) {
       try {
-        const q = query(collection(db, 'rooms', roomId, 'messages'), orderBy('timestamp', 'asc'));
+        const q = query(collection(db, 'rooms', roomId, 'messages'), orderBy('timestamp', 'desc'), limit(50));
         unsubscribeMessages = onSnapshot(q, (snapshot) => {
+          if (!isInitialLoad) {
+             snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    const data = change.doc.data();
+                    if (data.type !== 'system' && !mySentMessagesRef.current.has(data.id)) {
+                        setToastMessage("New message 🔔");
+                    }
+                }
+             });
+          }
           const loadedMessages = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-          }));
+          })).reverse();
           setMessages(loadedMessages);
+          isInitialLoad = false;
         }, (err) => {
           console.warn("Firestore error:", err);
         });
@@ -162,55 +195,80 @@ export function LiveChat() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, activeTypers]);
 
+  const fetchActive = useRef<Record<string, boolean>>({});
+  
   useEffect(() => {
     let isSubscribed = true;
     const translateMissing = async () => {
-      for (const msg of messages) {
-         if (msg.type === 'system') continue;
-         if (msg.originalLanguage !== language) {
-            const cacheKey = `${msg.id}-${language}`;
-            if (!translatedCache[cacheKey]) {
-               try {
-                  const targetLanguageName = SUPPORTED_LANGUAGES.find(l => l.code === language)?.name || language;
-                  const sourceLanguageName = SUPPORTED_LANGUAGES.find(l => l.code === msg.originalLanguage)?.name || msg.originalLanguage;
-                  
-                  const res = await fetch('/api/translate', {
-                     method: 'POST',
-                     headers: { 'Content-Type': 'application/json' },
-                     body: JSON.stringify({ 
-                       sourceText: msg.text, 
-                       targetLanguage: language, 
-                       targetLanguageName,
-                       sourceLanguage: msg.originalLanguage,
-                       sourceLanguageName
-                     })
-                  });
-                  const data = await res.json();
-                  if (isSubscribed && data && data.translatedText) {
-                     const translatedText = data.translatedText;
-                     setTranslatedCache(prev => ({...prev, [cacheKey]: translatedText}));
-                     
-                     setMessageHistory(prev => {
-                       if (prev.some(h => h.id === msg.id)) return prev;
-                       return [{
+      const messagesToTranslate = messages.filter(msg => {
+         if (msg.type === 'system') return false;
+         if (msg.originalLanguage === language) return false;
+         const cacheKey = `${msg.id}-${language}`;
+         if (translatedCache[cacheKey] || fetchActive.current[cacheKey]) return false;
+         return true;
+      });
+
+      if (messagesToTranslate.length === 0) return;
+
+      const batchTargetLanguageName = SUPPORTED_LANGUAGES.find(l => l.code === language)?.name || language;
+      const batchPayload = messagesToTranslate.map(msg => ({
+          id: msg.id,
+          text: msg.text,
+          lang: msg.originalLanguage
+      }));
+
+      // Mark all as fetching
+      messagesToTranslate.forEach(msg => {
+          fetchActive.current[`${msg.id}-${language}`] = true;
+      });
+
+      try {
+        const res = await fetch('/api/translate-batch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              messages: batchPayload,
+              targetLanguage: language,
+              targetLanguageName: batchTargetLanguageName
+            })
+        });
+        const data = await res.json();
+        if (isSubscribed && data && data.translatedTexts) {
+            setTranslatedCache(prev => {
+                const newCache = { ...prev };
+                for (const [id, text] of Object.entries(data.translatedTexts)) {
+                    newCache[`${id}-${language}`] = text as string;
+                }
+                return newCache;
+            });
+            
+            setMessageHistory(prev => {
+                let updated = [...prev];
+                messagesToTranslate.forEach(msg => {
+                   const translatedText = data.translatedTexts[msg.id];
+                   if (translatedText && !updated.some(h => h.id === msg.id)) {
+                       updated = [{
                          id: msg.id,
                          text: translatedText,
                          originalText: msg.text,
                          lang: language,
                          timestamp: msg.timestamp
-                       }, ...prev].slice(0, 50);
-                     });
-                  }
-               } catch (e) {
-                  console.error("Translation fail", e);
-               }
-            }
-         }
+                       }, ...updated];
+                   }
+                });
+                return updated.sort((a,b) => b.timestamp - a.timestamp).slice(0, 50);
+            });
+        }
+      } catch (e) {
+          console.error("Batch translation fail", e);
+          messagesToTranslate.forEach(msg => {
+              fetchActive.current[`${msg.id}-${language}`] = false;
+          });
       }
     };
     translateMissing();
     return () => { isSubscribed = false; };
-  }, [messages, language, translatedCache]);
+  }, [messages, language]);
 
   const handleCreateRoom = async () => {
     const newRoomId = Math.random().toString(36).substring(2, 8);
@@ -246,8 +304,34 @@ export function LiveChat() {
     }
   };
 
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [prediction, setPrediction] = useState("");
+
+  const fetchPrediction = useCallback(
+    debounce(async (text: string, lang: string) => {
+      if (!text || text.trim().length === 0) {
+        setPrediction("");
+        return;
+      }
+      try {
+        const res = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, language: SUPPORTED_LANGUAGES.find(l => l.code === lang)?.name || lang })
+        });
+        const data = await res.json();
+        setPrediction(data.suggestion || "");
+      } catch (e) {
+        setPrediction("");
+      }
+    }, 600),
+    []
+  );
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputText(e.target.value);
+    setPrediction("");
+    fetchPrediction(e.target.value, language);
     
     if (e.target.value.trim().length > 0) {
       notifyTyping(true);
@@ -258,6 +342,13 @@ export function LiveChat() {
     } else {
       notifyTyping(false);
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    }
+  };
+
+  const handleApplyPrediction = () => {
+    if (prediction) {
+       setInputText(prev => prev + " " + prediction.trim());
+       setPrediction("");
     }
   };
 
@@ -326,15 +417,40 @@ export function LiveChat() {
     }
   };
 
+  const toggleOriginal = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowingOriginals(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
   const renderMessageContent = (msg: { type?: string, id: string; text: string; originalLanguage: string }) => {
      if (msg.originalLanguage === language) {
         return msg.text; 
      }
      const cacheKey = `${msg.id}-${language}`;
      if (translatedCache[cacheKey]) {
-         return translatedCache[cacheKey];
+         return (
+             <div className="flex flex-col">
+                 <span>{translatedCache[cacheKey]}</span>
+                 <button onClick={(e) => toggleOriginal(msg.id, e)} className="text-[10px] mt-1.5 opacity-60 hover:opacity-100 text-left underline w-fit">
+                    {showingOriginals[msg.id] ? 'Hide original' : 'View original'}
+                 </button>
+                 {showingOriginals[msg.id] && (
+                     <div className="mt-1 pt-1 border-t border-current/20 text-xs italic opacity-80 break-words">
+                        {msg.originalLanguage.toUpperCase()}: {msg.text}
+                     </div>
+                 )}
+             </div>
+         );
      }
-     return "..."
+     return (
+        <span className="inline-flex items-center gap-2 opacity-70">
+           <span className="flex space-x-1 shrink-0 px-2 py-1">
+             <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+             <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+             <div className="w-1.5 h-1.5 bg-current rounded-full animate-bounce"></div>
+           </span>
+        </span>
+     );
   };
 
   // Compute active typers
@@ -372,6 +488,25 @@ export function LiveChat() {
        }
        
        if (roomStatus === 'active') {
+          if (!user) {
+             return (
+               <div className="max-w-md mx-auto mt-12 bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-center">
+                 <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <Users className="w-8 h-8 text-indigo-600" />
+                 </div>
+                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Sign in Required</h2>
+                 <p className="text-slate-500 mb-8">You must be signed in with Google to join this secure live chat.</p>
+                 <button onClick={signInWithGoogle} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 mb-4">
+                    <MessageSquare className="w-5 h-5" />
+                    Sign In with Google
+                 </button>
+                 <button onClick={() => { setPendingRoomId(null); localStorage.removeItem('pendingRoomId'); }} className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                    <ArrowLeft className="w-4 h-4" /> Cancel
+                 </button>
+               </div>
+             );
+          }
+
           return (
             <div className="max-w-md mx-auto mt-12 bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-center">
               <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
@@ -437,6 +572,20 @@ export function LiveChat() {
           </button>
         </div>
       );
+    } else if (!user) {
+      return (
+        <div className="max-w-md mx-auto mt-12 bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-center">
+           <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Users className="w-8 h-8 text-indigo-600" />
+           </div>
+           <h2 className="text-2xl font-bold text-slate-900 mb-2">Sign in Required</h2>
+           <p className="text-slate-500 mb-8">You must be signed in with Google to use Live Chat.</p>
+           <button onClick={signInWithGoogle} className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2 mb-4">
+              <MessageSquare className="w-5 h-5" />
+              Sign In with Google
+           </button>
+        </div>
+      );
     } else {
       return (
          <div className="text-center mt-20 text-slate-500 p-4">
@@ -446,8 +595,35 @@ export function LiveChat() {
     }
   }
 
+  const formatTimestamp = (timestamp: number) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const isToday = date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear();
+    const isYesterday = date.getDate() === yesterday.getDate() && date.getMonth() === yesterday.getMonth() && date.getFullYear() === yesterday.getFullYear();
+    
+    const timeFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: 'numeric', hour12: true });
+    const timeString = timeFormatter.format(date);
+    
+    if (isToday) return `Today at ${timeString}`;
+    if (isYesterday) return `Yesterday at ${timeString}`;
+    
+    const dateFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+    return `${dateFormatter.format(date)} at ${timeString}`;
+  };
+
   return (
     <div className="w-full h-full min-h-[100dvh] bg-slate-50 flex flex-col pt-0 md:pt-4 md:px-4 !pb-[env(safe-area-inset-bottom)] overflow-hidden fixed top-0 left-0 w-screen md:relative md:w-auto z-50 md:z-auto">
+       {toastMessage && (
+          <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-[100] animate-in fade-in slide-in-from-top-10">
+             <div className="bg-indigo-600 text-white px-4 py-2 rounded-full shadow-lg font-medium text-sm flex items-center gap-2">
+                {toastMessage}
+             </div>
+          </div>
+       )}
        <div className="w-full max-w-3xl mx-auto h-full flex flex-col bg-white md:rounded-3xl border-x md:border border-slate-200 shadow-sm relative overflow-hidden">
           
           {/* Header */}
@@ -519,10 +695,18 @@ export function LiveChat() {
                    );
                 }
                 
+                const isMyMessage = mySentMessagesRef.current.has(msg.id);
                 return (
-                  <div key={msg.id} className={`flex w-full ${msg.originalLanguage === language ? 'justify-end' : 'justify-start'}`}>
-                     <div className={`px-4 py-3 rounded-2xl max-w-[85%] md:max-w-[70%] text-[15px] shadow-sm break-words ${msg.originalLanguage === language ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'}`}>
-                        {renderMessageContent(msg)}
+                  <div key={msg.id} className={`flex w-full ${isMyMessage ? 'justify-end' : 'justify-start'}`}>
+                     <div className={`flex flex-col gap-1 max-w-[85%] md:max-w-[70%] text-[15px]`}>
+                       <div className={`px-4 py-3 rounded-2xl shadow-sm break-words ${isMyMessage ? 'bg-indigo-600 text-white rounded-tr-sm' : 'bg-white border border-slate-200 text-slate-800 rounded-tl-sm'}`}>
+                          {renderMessageContent(msg)}
+                       </div>
+                       {msg.timestamp && (
+                          <div className={`text-[10px] text-slate-400 px-1 ${isMyMessage ? 'text-right' : 'text-left'}`}>
+                             {formatTimestamp(msg.timestamp)}
+                          </div>
+                       )}
                      </div>
                   </div>
                 );
@@ -549,13 +733,47 @@ export function LiveChat() {
 
           {/* Input Area */}
           <div className="p-3 md:p-4 bg-white border-t border-slate-200 shrink-0 sticky bottom-0 z-10 w-full mb-[env(safe-area-inset-bottom)]">
+             {showEmojiPicker && (
+                <div className="absolute bottom-full right-4 mb-2 z-50">
+                   <EmojiPicker onEmojiClick={(emojiData) => {
+                       setInputText(prev => prev + emojiData.emoji);
+                       setPrediction("");
+                       fetchPrediction(inputText + emojiData.emoji, language);
+                       setShowEmojiPicker(false);
+                   }} />
+                </div>
+             )}
+             
+             {prediction && (
+                <div className="px-4 pb-2">
+                   <button onClick={handleApplyPrediction} className="text-xs text-indigo-600 font-medium px-3 py-1 bg-indigo-50 border border-indigo-100 rounded-full flex items-center gap-1 hover:bg-indigo-100 transition-colors">
+                      <span className="opacity-60 text-slate-500">Suggestion(Tab to apply):</span> {prediction}
+                   </button>
+                </div>
+             )}
+
              <div className="flex items-center gap-2 max-w-full">
+                <button
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="w-10 h-10 flex items-center justify-center shrink-0 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+                >
+                  <Smile className="w-5 h-5" />
+                </button>
                 <input 
                   type="text" 
                   value={inputText}
                   onChange={handleInputChange}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                  onKeyDown={(e) => {
+                     if (e.key === 'Enter') handleSendMessage();
+                     if (e.key === 'Tab' && prediction) {
+                        e.preventDefault();
+                        handleApplyPrediction();
+                     }
+                  }}
                   placeholder={`Write in ${SUPPORTED_LANGUAGES.find(l => l.code === language)?.name}...`}
+                  spellCheck="true"
+                  autoComplete="on"
+                  autoCorrect="on"
                   className="w-full min-w-0 flex-1 bg-slate-50 border border-slate-300 rounded-full px-5 py-3 text-sm md:text-base focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-slate-900"
                 />
                 <button onClick={handleSendMessage} disabled={!inputText.trim()} className="w-12 h-12 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-full flex items-center justify-center shadow-md transition-all shrink-0">

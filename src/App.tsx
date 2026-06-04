@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Home, MessageSquare, Shield, Smartphone, Video, FileText, Globe, Heart, LogIn, LogOut } from 'lucide-react';
+import { Menu, X, Home, MessageSquare, Shield, Smartphone, Video, FileText, Globe, Heart, LogIn, LogOut, FileSearch, LineChart, Briefcase } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { LandingPage } from './pages/LandingPage';
 import { TechnicalArchitecture } from './pages/TechnicalArchitecture';
@@ -7,13 +7,16 @@ import { VideoDemoMode } from './pages/VideoDemoMode';
 import { LiveChat } from './pages/LiveChat';
 import { SimpleText } from './pages/SimpleText';
 import { BusinessProtection } from './pages/BusinessProtection';
-import { AndroidOEMStrategy } from './pages/AndroidOEMStrategy';
+import { ProductSummary } from './pages/ProductSummary';
+import { MarketOpportunity } from './pages/MarketOpportunity';
 import { useAuth } from './lib/AuthContext';
 
 export default function App() {
   const { user, loading, signInWithGoogle, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash;
+    
+    // First link / Shared link behavior
     if (hash.includes('#/room/')) {
         const roomId = hash.replace('#/room/', '');
         if (roomId && roomId.length > 5) {
@@ -23,23 +26,66 @@ export default function App() {
         window.location.hash = '';
         return 'home';
     }
+
+    // Is it a fresh session from a shared base URL link?
+    const isNewSession = !sessionStorage.getItem('lingualayer-session-active');
+    sessionStorage.setItem('lingualayer-session-active', 'true');
+    
+    if (isNewSession) {
+       // First link after publish should strictly go to landing page
+       return 'home';
+    }
+
+    const savedTab = localStorage.getItem('activeTab');
+    if (savedTab) {
+       return savedTab;
+    }
     return 'home';
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const navItems = [
-    { id: 'home', label: 'Landing / Home', icon: Home },
-    { id: 'simple-text', label: 'Simple Text', icon: FileText },
-    { id: 'live-chat', label: 'Live Chat', icon: MessageSquare },
-    { id: 'business', label: 'Business Protection', icon: Shield },
-    { id: 'android', label: 'Android / OEM Strategy', icon: Smartphone },
-    { id: 'video', label: 'Video Demo', icon: Video },
-    { id: 'architecture', label: 'Overview / Architecture', icon: Globe },
+  React.useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
+
+  // Grouped Navigation Items (as requested)
+  const navGroups = [
+    {
+      name: "Product",
+      items: [
+        { id: 'home', label: 'Landing / Home', icon: Home },
+        { id: 'live-chat', label: 'Live Demo', icon: MessageSquare },
+        { id: 'product-summary', label: 'Product Summary', icon: FileSearch }
+      ]
+    },
+    {
+      name: "Proof",
+      items: [
+        { id: 'simple-text', label: 'Simple Text', icon: FileText },
+        { id: 'video', label: 'Video Demo', icon: Video },
+        { id: 'business', label: 'Business Protection', icon: Shield },
+        { id: 'architecture', label: 'How It Works / Architecture', icon: Globe }
+      ]
+    },
+    {
+      name: "Strategy",
+      items: [
+        { id: 'market-opportunity', label: 'Market Opportunity', icon: LineChart }
+      ]
+    }
   ];
 
   const handleNavigate = (id: string) => {
     setActiveTab(id);
     setSidebarOpen(false);
+  };
+
+  const getActiveLabel = () => {
+    for (const group of navGroups) {
+      const item = group.items.find(i => i.id === activeTab);
+      if (item) return item.label;
+    }
+    return '';
   };
 
   const renderContent = () => {
@@ -60,18 +106,16 @@ export default function App() {
         </div>
       );
     }
-
-    // Owner check could also be added for specific features if needed, but the prompt says 
-    // "EVERYONE CAN SEE LANDING PAGE BUT WHEN TRY TO ACCESS ANY OTHER PAGE OR FEATURE,IT WILL BE SIGN WITH EMAIL OR GOOGLE"
     
     switch (activeTab) {
       case 'home': return <LandingPage onNavigate={setActiveTab} />;
       case 'simple-text': return <SimpleText />;
       case 'live-chat': return <LiveChat />;
       case 'business': return <BusinessProtection />;
-      case 'android': return <AndroidOEMStrategy />;
       case 'video': return <VideoDemoMode />;
       case 'architecture': return <TechnicalArchitecture />;
+      case 'product-summary': return <ProductSummary />;
+      case 'market-opportunity': return <MarketOpportunity />;
       default: return <LandingPage onNavigate={setActiveTab} />;
     }
   };
@@ -102,16 +146,23 @@ export default function App() {
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="p-4 overflow-y-auto h-[calc(100%-80px)] space-y-1 pb-20">
-          {navItems.map(item => (
-            <button 
-              key={item.id}
-              onClick={() => handleNavigate(item.id)}
-              className={`w-full flex items-center text-left gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
-            >
-              <item.icon className="w-5 h-5 shrink-0" />
-              <span>{item.label}</span>
-            </button>
+        <div className="p-4 overflow-y-auto h-[calc(100%-80px)] space-y-4 pb-20">
+          {navGroups.map((group, idx) => (
+             <div key={idx}>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 px-4">{group.name}</h4>
+                <div className="space-y-1">
+                   {group.items.map(item => (
+                     <button 
+                       key={item.id}
+                       onClick={() => handleNavigate(item.id)}
+                       className={`w-full flex items-center text-left gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === item.id ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'}`}
+                     >
+                       <item.icon className="w-5 h-5 shrink-0" />
+                       <span>{item.label}</span>
+                     </button>
+                   ))}
+                </div>
+             </div>
           ))}
           
           <div className="pt-4 mt-4 border-t border-slate-100">
@@ -149,8 +200,9 @@ export default function App() {
              <span className="font-extrabold text-xl text-slate-900 tracking-tight">LinguaLayer <span className="text-indigo-600">AI</span></span>
           </div>
           <div className="ml-auto text-sm font-semibold text-slate-500 uppercase tracking-wider hidden sm:block">
-            {navItems.find(i => i.id === activeTab)?.label}
+            {getActiveLabel()}
           </div>
+
           
           <div className="ml-4 pl-4 border-l border-slate-200 hidden md:block">
             {loading ? <div className="w-8 h-8 rounded-full bg-slate-100 animate-pulse"></div> : user ? (

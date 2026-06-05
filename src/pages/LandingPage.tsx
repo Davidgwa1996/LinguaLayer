@@ -67,11 +67,11 @@ export function LandingPage({ onNavigate }: { onNavigate?: (id: string) => void 
         </div>
       </section>
 
-      {/* Naked Proof: Meaning Preservation */}
+      {/* Immutable Source Verification: Meaning Preservation */}
       <section className="py-24 px-4 md:px-8 bg-slate-900 border-b border-slate-800 text-white">
           <div className="max-w-6xl mx-auto text-center space-y-12">
              <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-                <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4">The Naked Proof</h2>
+                <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight mb-4">Immutable Source Verification</h2>
                 <p className="text-lg text-slate-400 max-w-3xl mx-auto">
                    Translations can be risky. We never mutate the original message. Here is exactly what happens when an English speaker messages a Chinese-speaking user, and they verify the semantic fidelity using <span className="text-white font-semibold">View Original</span>.
                 </p>

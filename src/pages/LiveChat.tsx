@@ -8,6 +8,8 @@ import { prepareMessageDelivery } from '../translationService';
 import { useAuth } from '../lib/AuthContext';
 import debounce from 'lodash/debounce';
 import EmojiPicker from 'emoji-picker-react';
+import { perf } from '../lib/firebase';
+import { trace } from 'firebase/performance';
 
 export function LiveChat() {
   const [roomId, setRoomId] = useState<string | null>(() => localStorage.getItem('activeRoomId'));
@@ -271,13 +273,14 @@ export function LiveChat() {
   }, [messages, language]);
 
   const handleCreateRoom = async () => {
+    if (!auth.currentUser) return;
     const newRoomId = Math.random().toString(36).substring(2, 8);
     // Remove the hash update from here since we use copy link
     setRoomId(newRoomId);
     
     if (db) {
       try {
-        await setDoc(doc(db, 'rooms', newRoomId), { created: serverTimestamp(), activeTypers: {}, status: 'active' });
+        await setDoc(doc(db, 'rooms', newRoomId), { created: serverTimestamp(), activeTypers: {}, status: 'active', ownerId: auth.currentUser.uid });
       } catch (e) {
          console.warn("Could not create room in Firestore", e);
       }
@@ -391,10 +394,17 @@ export function LiveChat() {
     bc.close();
 
     if (db) {
+       let msgTrace = null;
        try {
+         if (perf) {
+            msgTrace = trace(perf, "sendMessageDeliveryAndDBWrite");
+            msgTrace.start();
+         }
          await addDoc(collection(db, 'rooms', roomId, 'messages'), payload);
+         if (msgTrace) msgTrace.stop();
        } catch (e) {
          console.warn("Firestore add disabled.", e);
+         if (msgTrace) msgTrace.stop();
        }
     }
   };

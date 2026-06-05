@@ -1,14 +1,37 @@
 import express from "express";
 import cors from "cors";
 import path from "path";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(cors());
+  // Protect backend API
+  app.use(helmet());
+  
+  // Rate limiting to prevent unlimited spam requests
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per `window`
+    message: { error: "Too many requests from this IP, please try again later." },
+    standardHeaders: true,
+    legacyHeaders: false,
+  });
 
+  app.use(cors());
   app.use(express.json());
+  
+  // Error Tracking API
+  app.post("/api/error-track", (req, res) => {
+    // In production, this would integrate with Sentry, Logflare, or Firebase Crashlytics custom logs
+    console.error(`[CRASH-TRACK] client-side error: ${req.body.error}`, req.body);
+    res.status(200).json({ status: "logged" });
+  });
+
+  // Apply rate limiter specifically to API endpoints
+  app.use("/api/", apiLimiter);
 
   // API Route for translation
   app.post("/api/translate", async (req, res) => {

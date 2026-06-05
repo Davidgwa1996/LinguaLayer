@@ -1,11 +1,24 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
     match /rooms/{roomId} {
-      allow read, write: if true;
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow read: if request.auth != null;
+      
+      // Allow updates: typers can be updated by any auth user, but status requires ownerId
+      allow update: if request.auth != null && (
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'ownerId', 'created'])) || 
+        (resource.data.ownerId == request.auth.uid)
+      );
       
       match /messages/{messageId} {
-        allow read, write: if true;
+        allow read: if request.auth != null;
+        allow create: if request.auth != null;
+        allow update, delete: if false; // messages cannot be edited or deleted
       }
     }
   }

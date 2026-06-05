@@ -33,6 +33,18 @@ async function startServer() {
   // Apply rate limiter specifically to API endpoints
   app.use("/api/", apiLimiter);
 
+  // API Route for v1 sessions
+  app.get("/api/v1/health", (req, res) => res.json({ status: "ok", timestamp: new Date().toISOString() }));
+  app.post("/api/v1/sessions", (req, res) => res.json({ status: "created", id: "mock-session" }));
+  app.get("/api/v1/sessions/:sessionId", (req, res) => res.json({ status: "active", id: req.params.sessionId }));
+  app.post("/api/v1/sessions/:sessionId/join", (req, res) => res.json({ status: "joined" }));
+  app.post("/api/v1/sessions/:sessionId/leave", (req, res) => res.json({ status: "left" }));
+  app.post("/api/v1/sessions/:sessionId/rejoin", (req, res) => res.json({ status: "rejoined" }));
+  app.post("/api/v1/sessions/:sessionId/end", (req, res) => res.json({ status: "ended" }));
+  app.patch("/api/v1/sessions/:sessionId/participants/:participantId/language", (req, res) => res.json({ status: "updated" }));
+  app.post("/api/v1/sessions/:sessionId/messages", (req, res) => res.json({ status: "sent" }));
+  app.get("/api/v1/sessions/:sessionId/messages", (req, res) => res.json({ messages: [] }));
+
   // API Route for translation
   app.post("/api/translate", async (req, res) => {
     try {

@@ -12,10 +12,20 @@ import { MarketOpportunity } from './pages/MarketOpportunity';
 import { useAuth } from './lib/AuthContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
+import { PilotCustomerPage } from './pages/pilot/PilotCustomerPage';
+import { PilotAgentPage } from './pages/pilot/PilotAgentPage';
+
+import { PilotValidationPage } from './pages/pilot/PilotValidationPage';
+
 export default function App() {
   const { user, loading, signInWithGoogle, logout } = useAuth();
   const [activeTab, setActiveTab] = useState(() => {
     const hash = window.location.hash;
+    
+    if (hash === '#/pilot/customer') return 'pilot-customer';
+    if (hash === '#/pilot/agent') return 'pilot-agent';
+    if (hash === '#/pilot/validation') return 'pilot-validation';
+
     
     // First link / Shared link behavior
     if (hash.includes('#/room/')) {
@@ -44,6 +54,17 @@ export default function App() {
     return 'home';
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  React.useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#/pilot/customer') setActiveTab('pilot-customer');
+      else if (hash === '#/pilot/agent') setActiveTab('pilot-agent');
+      else if (hash === '#/pilot/validation') setActiveTab('pilot-validation');
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   React.useEffect(() => {
     localStorage.setItem('activeTab', activeTab);
@@ -90,24 +111,64 @@ export default function App() {
   };
 
   const renderContent = () => {
-    if (activeTab !== 'home' && !loading && !user) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
-             <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Shield className="w-8 h-8" />
-             </div>
-             <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
-             <p className="text-slate-500 mb-8">You must sign in to access this feature.</p>
-             <button onClick={signInWithGoogle} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                <Globe className="w-5 h-5 text-indigo-400" /> Sign In with Google
-             </button>
-             <p className="text-xs text-slate-400 mt-4">Required by administrator: njaudavid5@gmail.com</p>
+    const isPilotCustomerRoute = activeTab === 'pilot-customer';
+    const isAdminRoute = activeTab === 'pilot-agent' || activeTab === 'pilot-validation';
+
+    if (!loading) {
+      if (isAdminRoute) {
+        if (!user) {
+          return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
+                 <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Shield className="w-8 h-8" />
+                 </div>
+                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
+                 <p className="text-slate-500 mb-8">You must sign in to access this feature.</p>
+                 <button type="button" onClick={signInWithGoogle} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                    <Globe className="w-5 h-5 text-indigo-400" /> Sign In with Google
+                 </button>
+                 <p className="text-xs text-slate-400 mt-4">Required by administrator: njaudavid5@gmail.com</p>
+              </div>
+            </div>
+          );
+        }
+        if (user.email !== 'njaudavid5@gmail.com') {
+          return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <div className="bg-white p-8 rounded-3xl border border-rose-200 shadow-xl max-w-md w-full text-center">
+                 <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Shield className="w-8 h-8" />
+                 </div>
+                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Administrator access is required.</h2>
+                 <p className="text-slate-500 mb-8">Your account ({user.email}) does not have permission to view the SDK Pilot Agent or Validation Centre.</p>
+                 <button onClick={logout} className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+                    <LogOut className="w-4 h-4" /> Sign Out
+                 </button>
+              </div>
+            </div>
+          );
+        }
+      } else if (activeTab !== 'home' && !user && !isPilotCustomerRoute) {
+        // Legacy general auth requirement for Live Chat etc
+        return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh]">
+            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
+               <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Shield className="w-8 h-8" />
+               </div>
+               <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
+               <p className="text-slate-500 mb-8">You must sign in to access this feature.</p>
+               <button type="button" onClick={signInWithGoogle} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+                  <Globe className="w-5 h-5 text-indigo-400" /> Sign In with Google
+               </button>
+               <p className="text-xs text-slate-400 mt-4">Required by administrator: njaudavid5@gmail.com</p>
+            </div>
           </div>
-        </div>
-      );
+        );
+      }
     }
-    
+
     switch (activeTab) {
       case 'home': return <LandingPage onNavigate={setActiveTab} />;
       case 'simple-text': return <SimpleText />;
@@ -117,6 +178,9 @@ export default function App() {
       case 'architecture': return <TechnicalArchitecture />;
       case 'product-summary': return <ProductSummary />;
       case 'market-opportunity': return <MarketOpportunity />;
+      case 'pilot-customer': return <PilotCustomerPage />;
+      case 'pilot-agent': return <PilotAgentPage />;
+      case 'pilot-validation': return <PilotValidationPage />;
       default: return <LandingPage onNavigate={setActiveTab} />;
     }
   };
@@ -174,6 +238,25 @@ export default function App() {
                     <span className="text-xs font-bold text-slate-500 uppercase">Signed In</span>
                     <span className="text-sm font-medium text-slate-800 truncate" title={user.email || ''}>{user.email}</span>
                  </div>
+                 {user.email === 'njaudavid5@gmail.com' && (
+                    <div className="mb-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
+                      <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider mb-2">SDK Pilot Test Access</h4>
+                      <div className="space-y-2">
+                         <div className="flex gap-2 items-center">
+                            <button onClick={() => { window.open(window.location.origin + window.location.pathname + '#/pilot/validation', '_blank'); }} className="flex-1 text-left text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors truncate">Open Validation Centre</button>
+                            <button onClick={() => navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#/pilot/validation')} className="text-xs text-indigo-500 hover:text-indigo-800 font-medium px-2 py-1 bg-white rounded border border-indigo-100">Copy</button>
+                         </div>
+                         <div className="flex gap-2 items-center">
+                            <button onClick={() => { window.open(window.location.origin + window.location.pathname + '#/pilot/agent', '_blank'); }} className="flex-1 text-left text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors truncate">Open Pilot Agent</button>
+                            <button onClick={() => navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#/pilot/agent')} className="text-xs text-indigo-500 hover:text-indigo-800 font-medium px-2 py-1 bg-white rounded border border-indigo-100">Copy</button>
+                         </div>
+                         <div className="flex gap-2 items-center">
+                            <button onClick={() => { window.open(window.location.origin + window.location.pathname + '#/pilot/customer', '_blank'); }} className="flex-1 text-left text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors truncate">Open Pilot Customer</button>
+                            <button onClick={() => navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#/pilot/customer')} className="text-xs text-indigo-500 hover:text-indigo-800 font-medium px-2 py-1 bg-white rounded border border-indigo-100">Copy</button>
+                         </div>
+                      </div>
+                    </div>
+                 )}
                  <button onClick={logout} className="w-full flex items-center text-left gap-3 px-4 py-3 rounded-xl font-medium text-rose-600 hover:bg-rose-50 transition-all">
                    <LogOut className="w-5 h-5" />
                    <span>Sign Out</span>

@@ -1,0 +1,58 @@
+[
+  {
+    "id": "q1",
+    "sourceLanguage": "en",
+    "targetLanguage": "es",
+    "text": "Can we trade 300 units next month?",
+    "expectedMeaning": "question about trading 300 units next month",
+    "expectedPreserved": ["300"]
+  },
+  {
+    "id": "n1",
+    "sourceLanguage": "en",
+    "targetLanguage": "fr",
+    "text": "Please do not deliver the package before Friday.",
+    "expectedMeaning": "negation, instruct not to deliver before Friday",
+    "expectedPreserved": []
+  },
+  {
+    "id": "p1",
+    "sourceLanguage": "en",
+    "targetLanguage": "zh",
+    "text": "The total price is £2,450.",
+    "expectedMeaning": "price assertion",
+    "expectedPreserved": ["£2,450", "2,450", "2450"]
+  },
+  {
+    "id": "d1",
+    "sourceLanguage": "en",
+    "targetLanguage": "sw",
+    "text": "Can David Maina meet us at 10:30 AM?",
+    "expectedMeaning": "question about meeting time and person",
+    "expectedPreserved": ["David Maina", "10:30 AM"]
+  },
+  {
+    "id": "a1",
+    "sourceLanguage": "en",
+    "targetLanguage": "es",
+    "text": "The delivery address is 24 King Street.",
+    "expectedMeaning": "address assertion",
+    "expectedPreserved": ["24", "King Street"]
+  },
+  {
+    "id": "u1",
+    "sourceLanguage": "en",
+    "targetLanguage": "fr",
+    "text": "I might order 50 additional units.",
+    "expectedMeaning": "uncertainty about ordering additional units",
+    "expectedPreserved": ["50"]
+  },
+  {
+    "id": "q2",
+    "sourceLanguage": "en",
+    "targetLanguage": "zh",
+    "text": "Is order AB-300 ready?",
+    "expectedMeaning": "question about order status",
+    "expectedPreserved": ["AB-300"]
+  }
+]

@@ -52,17 +52,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (isMobile) {
       try {
         await signInWithRedirect(auth, provider);
-      } catch (error) {
+      } catch (error: any) {
         console.error("Google mobile sign in failed", error);
+        alert(`Sign in failed: ${error.message || 'Unknown error'}`);
       }
     } else {
       try {
         await signInWithPopup(auth, provider);
       } catch (error: any) {
         if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
-          await signInWithRedirect(auth, provider);
+          try {
+            await signInWithRedirect(auth, provider);
+          } catch (redirectError: any) {
+            console.error("Redirect fallback failed", redirectError);
+            alert(`Sign in failed: ${redirectError.message || 'Unknown error'}`);
+          }
         } else {
           console.error("Google sign in failed", error);
+          if (error.code === 'auth/unauthorized-domain') {
+            alert(`Firebase domain authorization error. Please add this exact domain to Firebase Console > Authentication > Settings > Authorized domains.`);
+          } else {
+            alert(`Sign in failed: ${error.message || 'Unknown error'}`);
+          }
         }
       }
     }

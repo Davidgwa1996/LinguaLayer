@@ -11,20 +11,38 @@ export function PilotCustomerPage() {
   const [client] = useState(() => createLinguaLayerClient());
   const [sessionId, setSessionId] = useState<string>('');
   const [joined, setJoined] = useState(false);
-  const [language, setLanguage] = useState('es');
+  const [language, setLanguage] = useState(() => localStorage.getItem('pilotCustomerLanguage') || 'es');
   const [displayName, setDisplayName] = useState('');
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [roomStatus, setRoomStatus] = useState<string>('active');
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
+    localStorage.setItem('pilotCustomerLanguage', language);
+  }, [language]);
+
+  useEffect(() => {
     if (user) {
-      setIsSigningIn(false);
-      if (!displayName && user.displayName) setDisplayName(user.displayName);
+       setIsSigningIn(false);
+       if (!displayName && user.displayName) setDisplayName(user.displayName);
+       
+       // Try to restore an active session for this user
+       setIsRestoring(true);
+       client.getCustomerActiveSession(user.uid).then(sess => {
+          if (sess) {
+             setSessionId(sess.id);
+             setJoined(true);
+          }
+       }).finally(() => setIsRestoring(false));
+    } else {
+       setJoined(false);
+       setSessionId('');
     }
-  }, [user]);
+  }, [user, client]); // Run once when user logs in
 
   const handleSignInGoogle = async () => {
     setIsSigningIn(true);
@@ -39,7 +57,14 @@ export function PilotCustomerPage() {
   };
   
   useEffect(() => {
-    if (joined && sessionId) {
+    if (joined && sessionId && user) {
+       // Re-join quietly inside memory for LinguaLayerClient
+       client.joinSession({ sessionId, preferredLanguage: language, displayName: displayName || user.displayName || 'Guest' }).catch(err => {
+         console.warn("Rejoin warn", err);
+       });
+
+       setMessages([]);
+
        const uRoom = client.subscribeToSession((sess) => {
           setRoomStatus(sess.status);
        });
@@ -54,16 +79,27 @@ export function PilotCustomerPage() {
          uMsgs();
        };
     }
-  }, [joined, sessionId, client]);
+  }, [joined, sessionId, client, user]); // Removed language and displayName from deps to prevent re-subscribing and clearing messages
+
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const handleJoin = async () => {
-     if (!sessionId || !displayName) return;
-     await client.joinSession({ sessionId, preferredLanguage: language, displayName });
-     setJoined(true);
+  const handleStartChat = async () => {
+     if (!displayName.trim()) return;
+     setIsStarting(true);
+     try {
+       const session = await client.createSession();
+       setSessionId(session.id);
+       await client.joinSession({ sessionId: session.id, preferredLanguage: language, displayName });
+       setJoined(true);
+     } catch (err) {
+       console.error("Failed to create pilot session", err);
+       alert("Failed to start chat. Please try again.");
+     } finally {
+       setIsStarting(false);
+     }
   };
 
   const handleSend = async () => {
@@ -91,7 +127,9 @@ export function PilotCustomerPage() {
     
     useEffect(() => {
        if (!isMe && msg.type === 'chat' && msg.originalText) {
-          prepareMessageDelivery(msg.originalText, language).then(res => setDisplayMsg(res.deliveredText)).catch(() => setDisplayMsg(msg.originalText));
+          prepareMessageDelivery(msg.originalText, language, msg.senderLanguage)
+             .then(res => setDisplayMsg(res.deliveredText))
+             .catch(() => setDisplayMsg(msg.originalText));
        }
     }, [msg, isMe, language]);
 
@@ -117,10 +155,10 @@ export function PilotCustomerPage() {
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Customer Support</h1>
             <p className="text-slate-500 mb-6 text-sm">Join a pilot support session</p>
             
-            {authLoading || isSigningIn ? (
+            {authLoading || isSigningIn || isRestoring ? (
                <div className="py-12 flex flex-col items-center justify-center">
                   <Loader2 className="w-8 h-8 text-indigo-600 animate-spin mb-4" />
-                  <span className="text-sm font-medium text-slate-500">Authenticating...</span>
+                  <span className="text-sm font-medium text-slate-500">{isRestoring ? 'Restoring session...' : 'Authenticating...'}</span>
                </div>
             ) : !user ? (
                <div className="space-y-4">
@@ -136,23 +174,21 @@ export function PilotCustomerPage() {
                   </button>
                </div>
             ) : (
-                <div className="space-y-4">
-                   <div>
-                     <label className="block text-left text-sm font-medium text-slate-700 mb-1">Session ID</label>
-                     <input className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-indigo-500" value={sessionId} onChange={e => setSessionId(e.target.value)} placeholder="Enter support ticket ID" />
-                   </div>
-                   <div>
-                     <label className="block text-left text-sm font-medium text-slate-700 mb-1">Your Name</label>
-                     <input className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-indigo-500" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="e.g. Maria" />
-                   </div>
-                   <div>
-                     <label className="block text-left text-sm font-medium text-slate-700 mb-1">Your Language</label>
-                     <select className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-900 bg-white" value={language} onChange={e => setLanguage(e.target.value)}>
-                        {SUPPORTED_LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
-                     </select>
-                   </div>
-                   <button type="button" onClick={handleJoin} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition shadow-md">Start Chat</button>
-                </div>
+            <div className="space-y-4">
+               <div>
+                  <label className="block text-left text-sm font-medium text-slate-700 mb-1">Your Name</label>
+                  <input className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-900 focus:ring-2 focus:ring-indigo-500" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="e.g. Maria" />
+               </div>
+               <div>
+                  <label className="block text-left text-sm font-medium text-slate-700 mb-1">Your Language</label>
+                  <select className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-900 bg-white" value={language} onChange={e => setLanguage(e.target.value)}>
+                     {SUPPORTED_LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.name}</option>)}
+                  </select>
+               </div>
+               <button type="button" onClick={handleStartChat} disabled={isStarting || !displayName.trim()} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl font-bold transition shadow-md flex items-center justify-center">
+                  {isStarting ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Start Chat'}
+               </button>
+            </div>
             )}
          </div>
        </div>
@@ -160,8 +196,8 @@ export function PilotCustomerPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col sm:p-4">
-       <div className="bg-white mx-auto w-full max-w-md sm:rounded-3xl shadow-2xl flex flex-col h-[100dvh] sm:h-[90dvh] border border-slate-200 overflow-hidden relative">
+    <div className="h-[100dvh] w-full bg-slate-100 flex flex-col sm:p-4 overflow-hidden">
+       <div className="bg-white mx-auto w-full h-full max-w-md sm:rounded-3xl shadow-2xl flex flex-col border border-slate-200 overflow-hidden relative">
           <div className="bg-indigo-600 p-4 shrink-0 flex items-center justify-between shadow-md z-10">
              <div className="flex items-center gap-3">
                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
@@ -170,17 +206,17 @@ export function PilotCustomerPage() {
                <div>
                  <h2 className="font-bold text-white leading-tight">Support Team</h2>
                  <p className="text-indigo-100 text-xs flex items-center gap-1">
-                   <span className={`w-2 h-2 rounded-full ${roomStatus==='active' ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                   {roomStatus==='active' ? 'Live Chat' : 'Chat Ended'}
+                   <span className={`w-2 h-2 rounded-full ${roomStatus==='active' ? 'bg-emerald-400' : roomStatus === 'waiting_for_agent' ? 'bg-amber-400' : 'bg-rose-400'}`}></span>
+                   {roomStatus==='active' ? 'Live Chat' : roomStatus==='waiting_for_agent' ? 'Waiting for Agent...' : 'Chat Ended'}
                  </p>
                </div>
              </div>
-             <button onClick={() => { client.leaveSession(); setJoined(false); }} className="text-white/80 hover:text-white p-2">
-                <LogOut className="w-5 h-5" />
+             <button onClick={() => { client.leaveSession(); setJoined(false); }} className="text-white/80 hover:text-white p-3 md:p-2 -mr-2">
+                <LogOut className="w-6 h-6 md:w-5 md:h-5" />
              </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-4 bg-slate-50 relative">
+          <div className="flex-1 overflow-y-auto p-4 bg-slate-50 relative min-h-0">
              <div className="text-center my-4">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 bg-slate-200/50 px-3 py-1 rounded-full">Chat Started</span>
              </div>
@@ -193,11 +229,11 @@ export function PilotCustomerPage() {
              )}
           </div>
 
-          <div className="p-4 bg-white border-t border-slate-100 shrink-0">
-             <div className="flex gap-2">
+          <div className="p-3 md:p-4 bg-white border-t border-slate-100 shrink-0 mb-[env(safe-area-inset-bottom)]">
+             <div className="flex gap-2 items-center">
                 <input 
                   disabled={roomStatus==='ended'}
-                  className="flex-1 bg-slate-100 border-none rounded-full px-5 py-3 text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+                  className="flex-1 bg-slate-100 border-none rounded-full px-4 md:px-5 py-3 md:py-3 text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 text-base"
                   placeholder="Type your message..."
                   value={inputText}
                   onChange={e => setInputText(e.target.value)}

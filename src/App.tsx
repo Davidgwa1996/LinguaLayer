@@ -14,8 +14,157 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 import { PilotCustomerPage } from './pages/pilot/PilotCustomerPage';
 import { PilotAgentPage } from './pages/pilot/PilotAgentPage';
-
 import { PilotValidationPage } from './pages/pilot/PilotValidationPage';
+
+function PilotLinkItem({ title, route }: { title: string, route: string }) {
+  const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const url = `${window.location.origin}${window.location.pathname}${route}`;
+
+  const openLink = () => {
+    window.open(url, '_blank');
+  };
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+        showSuccess();
+      } else {
+        fallbackCopyText(url);
+        showSuccess();
+      }
+    } catch (err) {
+      setCopyFailed(true);
+    }
+  };
+
+  const fallbackCopyText = (text: string) => {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    textarea.setSelectionRange(0, text.length);
+    const success = document.execCommand('copy');
+    document.body.removeChild(textarea);
+    if (!success) {
+      throw new Error('Fallback copy failed');
+    }
+  };
+
+  const showSuccess = () => {
+    setCopied(true);
+    setCopyFailed(false);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleShare = async () => {
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: title,
+          text: `Open ${title}`,
+          url: url
+        });
+      } catch (err) {
+        console.error('Share failed', err);
+      }
+    } else {
+      handleCopy();
+    }
+  };
+
+  const canShare = !!navigator.share;
+
+  return (
+    <div className="flex flex-col gap-1 py-1 border-b border-indigo-100/50 last:border-0">
+       <span className="text-xs font-bold text-indigo-900">{title}</span>
+       <input 
+         title="Complete URL"
+         type="text" 
+         readOnly 
+         value={url} 
+         className="w-full text-[10px] sm:text-xs bg-white border border-indigo-100 rounded px-2 py-1 text-slate-500 focus:outline-none focus:border-indigo-300"
+       />
+       {copyFailed && (
+         <span className="text-[10px] text-rose-500 font-medium my-1">
+           Automatic copying was blocked. Select and copy the link manually above.
+         </span>
+       )}
+       <div className="flex gap-2 items-center mt-1">
+          <button onClick={openLink} className="flex-1 text-center py-1 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded transition-colors shadow-sm">Open</button>
+          <button onClick={handleCopy} className={`flex-1 text-center py-1 text-xs font-bold transition-colors shadow-sm rounded border ${copied ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-indigo-600 hover:bg-slate-50 border-indigo-200'}`}>
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+          {canShare && (
+             <button onClick={handleShare} className="flex-1 text-center py-1 text-xs font-bold bg-slate-800 text-white hover:bg-slate-900 rounded transition-colors shadow-sm">Share</button>
+          )}
+       </div>
+    </div>
+  );
+}
+
+function AdminOnlyRoute({ children, user, isSigningIn, handleSignIn, logout }: any) {
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
+           <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8" />
+           </div>
+           <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
+           <p className="text-slate-500 mb-8">You must sign in to access the Validation Centre.</p>
+           <button type="button" onClick={handleSignIn} disabled={isSigningIn} className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-75 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+              <Globe className={`w-5 h-5 text-indigo-400 ${isSigningIn ? 'animate-spin' : ''}`} /> 
+              {isSigningIn ? 'Signing In...' : 'Sign In with Google'}
+           </button>
+           <p className="text-xs text-slate-400 mt-4">Required by administrator: njaudavid5@gmail.com</p>
+        </div>
+      </div>
+    );
+  }
+  if (user.email !== 'njaudavid5@gmail.com') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="bg-white p-8 rounded-3xl border border-rose-200 shadow-xl max-w-md w-full text-center">
+           <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8" />
+           </div>
+           <h2 className="text-2xl font-bold text-slate-900 mb-2">Administrator access is required.</h2>
+           <p className="text-slate-500 mb-8">Your account ({user.email}) does not have permission to view the SDK Pilot Validation Centre.</p>
+           <button onClick={logout} className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
+              <LogOut className="w-4 h-4" /> Sign Out
+           </button>
+        </div>
+      </div>
+    );
+  }
+  return children;
+}
+
+function AuthenticatedRoute({ children, user, isSigningIn, handleSignIn, itemName }: any) {
+  if (!user) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
+           <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Shield className="w-8 h-8" />
+           </div>
+           <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
+           <p className="text-slate-500 mb-8">You must sign in to access {itemName}.</p>
+           <button type="button" onClick={handleSignIn} disabled={isSigningIn} className="w-full py-4 bg-slate-900 hover:bg-slate-800 disabled:opacity-75 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
+              <Globe className={`w-5 h-5 text-indigo-400 ${isSigningIn ? 'animate-spin' : ''}`} /> 
+              {isSigningIn ? 'Signing In...' : 'Sign In with Google'}
+           </button>
+        </div>
+      </div>
+    );
+  }
+  return children;
+}
 
 export default function App() {
   const { user, loading, signInWithGoogle, logout } = useAuth();
@@ -54,6 +203,13 @@ export default function App() {
     return 'home';
   });
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
+
+  const handleSignIn = async () => {
+    setIsSigningIn(true);
+    await signInWithGoogle();
+    setIsSigningIn(false);
+  };
 
   React.useEffect(() => {
     const handleHashChange = () => {
@@ -111,63 +267,7 @@ export default function App() {
   };
 
   const renderContent = () => {
-    const isPilotCustomerRoute = activeTab === 'pilot-customer';
-    const isAdminRoute = activeTab === 'pilot-agent' || activeTab === 'pilot-validation';
-
-    if (!loading) {
-      if (isAdminRoute) {
-        if (!user) {
-          return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
-              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
-                 <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Shield className="w-8 h-8" />
-                 </div>
-                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
-                 <p className="text-slate-500 mb-8">You must sign in to access this feature.</p>
-                 <button type="button" onClick={signInWithGoogle} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                    <Globe className="w-5 h-5 text-indigo-400" /> Sign In with Google
-                 </button>
-                 <p className="text-xs text-slate-400 mt-4">Required by administrator: njaudavid5@gmail.com</p>
-              </div>
-            </div>
-          );
-        }
-        if (user.email !== 'njaudavid5@gmail.com') {
-          return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh]">
-              <div className="bg-white p-8 rounded-3xl border border-rose-200 shadow-xl max-w-md w-full text-center">
-                 <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Shield className="w-8 h-8" />
-                 </div>
-                 <h2 className="text-2xl font-bold text-slate-900 mb-2">Administrator access is required.</h2>
-                 <p className="text-slate-500 mb-8">Your account ({user.email}) does not have permission to view the SDK Pilot Agent or Validation Centre.</p>
-                 <button onClick={logout} className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all flex items-center justify-center gap-2">
-                    <LogOut className="w-4 h-4" /> Sign Out
-                 </button>
-              </div>
-            </div>
-          );
-        }
-      } else if (activeTab !== 'home' && !user && !isPilotCustomerRoute) {
-        // Legacy general auth requirement for Live Chat etc
-        return (
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-xl max-w-md w-full text-center">
-               <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Shield className="w-8 h-8" />
-               </div>
-               <h2 className="text-2xl font-bold text-slate-900 mb-2">Authentication Required</h2>
-               <p className="text-slate-500 mb-8">You must sign in to access this feature.</p>
-               <button type="button" onClick={signInWithGoogle} className="w-full py-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold shadow-lg transition-all flex items-center justify-center gap-2">
-                  <Globe className="w-5 h-5 text-indigo-400" /> Sign In with Google
-               </button>
-               <p className="text-xs text-slate-400 mt-4">Required by administrator: njaudavid5@gmail.com</p>
-            </div>
-          </div>
-        );
-      }
-    }
+    if (loading) return null; // or a spinner
 
     switch (activeTab) {
       case 'home': return <LandingPage onNavigate={setActiveTab} />;
@@ -178,9 +278,21 @@ export default function App() {
       case 'architecture': return <TechnicalArchitecture />;
       case 'product-summary': return <ProductSummary />;
       case 'market-opportunity': return <MarketOpportunity />;
-      case 'pilot-customer': return <PilotCustomerPage />;
-      case 'pilot-agent': return <PilotAgentPage />;
-      case 'pilot-validation': return <PilotValidationPage />;
+      
+      case 'pilot-customer': 
+         return <PilotCustomerPage />;
+      case 'pilot-agent': 
+         return (
+            <AuthenticatedRoute user={user} isSigningIn={isSigningIn} handleSignIn={handleSignIn} itemName="Pilot Agent">
+               <PilotAgentPage />
+            </AuthenticatedRoute>
+         );
+      case 'pilot-validation': 
+         return (
+            <AdminOnlyRoute user={user} isSigningIn={isSigningIn} handleSignIn={handleSignIn} logout={logout}>
+               <PilotValidationPage />
+            </AdminOnlyRoute>
+         );
       default: return <LandingPage onNavigate={setActiveTab} />;
     }
   };
@@ -241,19 +353,10 @@ export default function App() {
                  {user.email === 'njaudavid5@gmail.com' && (
                     <div className="mb-2 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
                       <h4 className="text-xs font-bold text-indigo-800 uppercase tracking-wider mb-2">SDK Pilot Test Access</h4>
-                      <div className="space-y-2">
-                         <div className="flex gap-2 items-center">
-                            <button onClick={() => { window.open(window.location.origin + window.location.pathname + '#/pilot/validation', '_blank'); }} className="flex-1 text-left text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors truncate">Open Validation Centre</button>
-                            <button onClick={() => navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#/pilot/validation')} className="text-xs text-indigo-500 hover:text-indigo-800 font-medium px-2 py-1 bg-white rounded border border-indigo-100">Copy</button>
-                         </div>
-                         <div className="flex gap-2 items-center">
-                            <button onClick={() => { window.open(window.location.origin + window.location.pathname + '#/pilot/agent', '_blank'); }} className="flex-1 text-left text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors truncate">Open Pilot Agent</button>
-                            <button onClick={() => navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#/pilot/agent')} className="text-xs text-indigo-500 hover:text-indigo-800 font-medium px-2 py-1 bg-white rounded border border-indigo-100">Copy</button>
-                         </div>
-                         <div className="flex gap-2 items-center">
-                            <button onClick={() => { window.open(window.location.origin + window.location.pathname + '#/pilot/customer', '_blank'); }} className="flex-1 text-left text-xs font-bold text-indigo-700 hover:text-indigo-900 transition-colors truncate">Open Pilot Customer</button>
-                            <button onClick={() => navigator.clipboard.writeText(window.location.origin + window.location.pathname + '#/pilot/customer')} className="text-xs text-indigo-500 hover:text-indigo-800 font-medium px-2 py-1 bg-white rounded border border-indigo-100">Copy</button>
-                         </div>
+                      <div className="flex flex-col gap-2">
+                         <PilotLinkItem title="Validation Centre" route="#/pilot/validation" />
+                         <PilotLinkItem title="Pilot Agent" route="#/pilot/agent" />
+                         <PilotLinkItem title="Pilot Customer" route="#/pilot/customer" />
                       </div>
                     </div>
                  )}
@@ -263,9 +366,9 @@ export default function App() {
                  </button>
                </div>
              ) : (
-                <button onClick={signInWithGoogle} className="w-full flex items-center text-left gap-3 px-4 py-3 rounded-xl font-medium text-indigo-600 hover:bg-indigo-50 transition-all">
+                <button onClick={handleSignIn} disabled={isSigningIn} className="w-full flex items-center text-left gap-3 px-4 py-3 rounded-xl font-medium text-indigo-600 hover:bg-indigo-50 transition-all">
                   <LogIn className="w-5 h-5" />
-                  <span>Sign In</span>
+                  <span>{isSigningIn ? 'Signing In...' : 'Sign In'}</span>
                 </button>
              )}
           </div>
@@ -298,8 +401,8 @@ export default function App() {
                  </button>
                </div>
             ) : (
-               <button onClick={signInWithGoogle} className="text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                 <LogIn className="w-4 h-4" /> Sign In
+               <button onClick={handleSignIn} disabled={isSigningIn} className="text-sm font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 px-3 py-1.5 rounded-lg flex items-center gap-2 disabled:opacity-75">
+                 <LogIn className="w-4 h-4" /> {isSigningIn ? 'Signing In...' : 'Sign In'}
                </button>
             )}
           </div>

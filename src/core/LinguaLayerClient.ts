@@ -1,8 +1,8 @@
 import { db, auth } from '../lib/firebase';
 import { 
-  collection, doc, getDoc, setDoc, updateDoc, addDoc, 
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, 
   onSnapshot, query, orderBy, limit, serverTimestamp, 
-  Unsubscribe 
+  Unsubscribe, or, where
 } from 'firebase/firestore';
 import { Session, Participant, DisplayMessage } from '../types';
 
@@ -43,9 +43,9 @@ export class LinguaLayerClient {
       created: serverTimestamp(),
       createdAt: serverTimestamp(),
       activeTypers: {},
-      status: 'active',
-      ownerId: auth.currentUser.uid,
-      ownerEmail: auth.currentUser.email
+      status: 'waiting_for_agent',
+      customerUid: auth.currentUser.uid,
+      customerName: auth.currentUser.displayName || 'Guest',
     };
     await setDoc(doc(db, 'rooms', newRoomId), sessionDoc);
     this.sessionId = newRoomId;
@@ -56,6 +56,26 @@ export class LinguaLayerClient {
     const docSnap = await getDoc(doc(db, 'rooms', sessionId));
     if (!docSnap.exists()) throw new Error("Session not found");
     return { id: sessionId, ...docSnap.data() } as Session;
+  }
+
+  async getCustomerActiveSession(customerUid: string): Promise<Session | null> {
+    const q = query(
+      collection(db, 'rooms'),
+      where('customerUid', '==', customerUid),
+      limit(5)
+    );
+    const snap = await getDocs(q);
+    
+    // Sort array in memory to avoid missing index for combination query
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    docs.sort((a: any, b: any) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    
+    for (const data of docs) {
+      if ((data as any).status !== 'ended') {
+         return data as Session;
+      }
+    }
+    return null;
   }
 
   async joinSession(input: JoinSessionInput): Promise<Participant> {
@@ -149,6 +169,43 @@ export class LinguaLayerClient {
   async rejoinSession(sessionId: string): Promise<void> {
     this.sessionId = sessionId;
     await this.sendSystemMessage('joined');
+  }
+
+  subscribeToAgentSessions(callback: (sessions: any[]) => void, agentUid: string): () => void {
+    const q = query(collection(db, 'rooms'), 
+      or(
+        where('status', '==', 'waiting_for_agent'),
+        where('agentUid', '==', agentUid)
+      ),
+      limit(50)
+    );
+    
+    const unsub = onSnapshot(q, (snapshot) => {
+      const sessions: any[] = [];
+      snapshot.forEach(doc => {
+         sessions.push({ id: doc.id, ...doc.data() });
+      });
+      // Sort client-side to avoid compound index requirement
+      sessions.sort((a, b) => {
+         const tA = a.createdAt?.toMillis() || 0;
+         const tB = b.createdAt?.toMillis() || 0;
+         return tB - tA;
+      });
+      callback(sessions);
+    });
+    return unsub;
+  }
+
+  async acceptSession(sessionId: string, agentUid: string, agentEmail: string | null): Promise<void> {
+    if (!auth.currentUser) throw new Error("Must be signed in");
+    const roomRef = doc(db, 'rooms', sessionId);
+    // In a real production app we'd use a transaction here to prevent race conditions.
+    await updateDoc(roomRef, {
+       status: 'active',
+       agentUid,
+       agentEmail
+    });
+    this.sessionId = sessionId;
   }
 
   async endSession(): Promise<void> {

@@ -23,13 +23,45 @@ export type DeliveryEngineResponse = {
 
 export async function prepareMessageDelivery(
   sourceText: string, 
-  receiverLanguage: string
+  receiverLanguage: string,
+  senderLanguage?: string
 ): Promise<DeliveryEngineResponse> {
-  // In a real implementation, this would call the Gemini AI with the prompt above.
+  try {
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sourceText,
+        sourceLanguage: senderLanguage,
+        targetLanguage: receiverLanguage
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.translatedText) {
+      return {
+        receiverLanguageCode: receiverLanguage,
+        deliveredText: data.translatedText,
+        confidence: 0.95,
+        warning: null
+      };
+    } else {
+      console.warn("Translation returned error or empty text:", data);
+      return {
+        receiverLanguageCode: receiverLanguage,
+        deliveredText: data.translatedText || `[Translation error: ${data.error || 'Unknown'}] ${sourceText}`,
+        confidence: 0,
+        warning: "Translation unavailable"
+      };
+    }
+  } catch (error) {
+    console.error("Translation delivery failed:", error);
+  }
+  
+  // Fallback
   return {
     receiverLanguageCode: receiverLanguage,
-    deliveredText: `[Delivered to ${receiverLanguage}] ${sourceText}`,
-    confidence: 0.95,
-    warning: null
+    deliveredText: `[Translation failed] ${sourceText}`,
+    confidence: 0,
+    warning: "Translation unavailable"
   };
 }

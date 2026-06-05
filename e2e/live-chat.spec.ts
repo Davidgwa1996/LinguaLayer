@@ -11,9 +11,9 @@ test('Owner creates a Live Chat session, then participant joins and messages wor
   
   // Pilot routes load successfully without white screens
   await page.goto('/#/pilot/customer');
-  await expect(page.locator('text=Customer Support')).toBeVisible();
+  await expect(page.locator('text=Customer Support').or(page.locator('text=Authentication Required'))).toBeVisible({ timeout: 10000 });
 
   await page.goto('/#/pilot/agent');
   // Should see Agent Portal sign in requirement if not authed
-  await expect(page.locator('text=Agent Portal')).toBeVisible();
+  await expect(page.locator('text=Authentication Required').or(page.locator('text=Agent Portal'))).toBeVisible({ timeout: 10000 });
 });

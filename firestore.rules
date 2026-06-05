@@ -6,18 +6,36 @@ service cloud.firestore {
     }
 
     match /rooms/{roomId} {
-      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
-      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.customerUid == request.auth.uid;
       
-      // Allow updates: typers can be updated by any auth user, but status requires ownerId
+      allow read: if request.auth != null && (
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.agentUid == request.auth.uid ||
+        resource.data.status == 'waiting_for_agent' ||
+        (request.auth.token != null && request.auth.token.email == 'njaudavid5@gmail.com')
+      );
+      
       allow update: if request.auth != null && (
-        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'ownerId', 'created'])) || 
-        (resource.data.ownerId == request.auth.uid)
+        resource.data.customerUid == request.auth.uid ||
+        resource.data.agentUid == request.auth.uid ||
+        (resource.data.status == 'waiting_for_agent' && request.resource.data.status == 'active' && request.resource.data.agentUid == request.auth.uid) ||
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'customerUid', 'agentUid', 'created', 'createdAt'])) ||
+        (request.auth.token != null && request.auth.token.email == 'njaudavid5@gmail.com')
       );
       
       match /messages/{messageId} {
-        allow read: if request.auth != null;
-        allow create: if request.auth != null;
+        allow read: if request.auth != null && (
+          get(/databases/$(database)/documents/rooms/$(roomId)).data.customerUid == request.auth.uid ||
+          get(/databases/$(database)/documents/rooms/$(roomId)).data.agentUid == request.auth.uid ||
+          (request.auth.token != null && request.auth.token.email == 'njaudavid5@gmail.com') ||
+          get(/databases/$(database)/documents/rooms/$(roomId)).data.status == 'waiting_for_agent'
+        );
+        allow create: if request.auth != null && (
+          get(/databases/$(database)/documents/rooms/$(roomId)).data.customerUid == request.auth.uid ||
+          get(/databases/$(database)/documents/rooms/$(roomId)).data.agentUid == request.auth.uid ||
+          (request.auth.token != null && request.auth.token.email == 'njaudavid5@gmail.com') ||
+          get(/databases/$(database)/documents/rooms/$(roomId)).data.status == 'waiting_for_agent'
+        ) && get(/databases/$(database)/documents/rooms/$(roomId)).data.status != 'ended';
         allow update, delete: if false; // messages cannot be edited or deleted
       }
     }
